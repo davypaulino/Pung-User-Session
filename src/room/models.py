@@ -38,3 +38,38 @@ class Room(models.Model):
 
     def __str__(self):
         return self.roomName
+
+class Player(models.Model):
+    playerId = models.CharField(primary_key=True, max_length=64, editable=False)
+    playerName = models.CharField(max_length=100)
+    roomCode = models.CharField(max_length=64)
+    profileColor = models.IntegerField(default=0)
+    urlProfileImage = models.CharField(max_length=100)
+    createdBy = models.CharField(max_length=64)
+    createdAt = models.DateTimeField(auto_now_add=True)
+    updatedBy = models.CharField(max_length=64)
+    updatedAt = models.DateTimeField(auto_now=True)
+
+class TotalScores(models.Model):
+    playerId = models.CharField(primary_key=True, max_length=64, editable=False)
+    score = models.IntegerField(default=0)
+    createdBy = models.CharField(max_length=64)
+    createdAt = models.DateTimeField(auto_now_add=True)
+    updatedBy = models.CharField(max_length=64)
+    updatedAt = models.DateTimeField(auto_now=True)
+
+class Tournament(models.Model):
+    tournamentCode = models.CharField(primary_key=True, max_length=64, editable=False)
+    numberOfGames = models.IntegerField(default=0)
+    amountOfPlayers = models.IntegerField(default=0)
+    tournamentWinner = models.CharField(max_length=100)
+    createdBy = models.CharField(max_length=64)
+    createdAt = models.DateTimeField(auto_now_add=True)
+    updatedBy = models.CharField(max_length=64)
+    updatedAt = models.DateTimeField(auto_now=True)
+
+class TournamentRank(models.Model):
+    playerId = models.CharField(primary_key=True, max_length=64, editable=False)
+    tournamentCode = models.CharField(max_length=64, editable=False)
+    rankPosition = models.IntegerField(default=0)
+    numberOfGamesPlayed = models.IntegerField(default=0)
