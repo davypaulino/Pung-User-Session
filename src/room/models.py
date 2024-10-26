@@ -1,5 +1,6 @@
 from django.db import models
 from enum import Enum
+import hashlib
 
 class roomTypes(Enum):
     MATCH = 0
@@ -31,7 +32,7 @@ class Room(models.Model):
     def save(self, *args, **kwargs):
         if not self.id:
             # Gerar o hash a partir do nome (ou qualquer outra informação que você desejar)
-            hash_input = (self.name + self.nickname).encode('utf-8')
+            hash_input = (self.roomName + self.roomStatus).encode('utf-8')
             self.id = hashlib.sha256(hash_input).hexdigest()
         super().save(*args, **kwargs)
 
