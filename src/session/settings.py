@@ -74,14 +74,15 @@ WSGI_APPLICATION = "session.wsgi.application"
 # Database
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases
 
+
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'USER_SESSION_DB',
-        'USER': 'db_user',
-        'PASSWORD': 'example',
-        'HOST': '0.0.0.0',  # Ou o endereço do servidor de banco de dados
-        'PORT': '5432',       # Porta padrão do PostgreSQL
+        'NAME': os.environ.get('DB_NAME', 'USER_SESSION_DB'),
+        'USER': os.environ.get('DB_USER', 'db_user'),
+        'PASSWORD': os.environ.get('DB_PASSWORD', 'example'),
+        'HOST': os.environ.get('DB_HOST', '0.0.0.0'),  # Endereço do servidor de banco de dados
+        'PORT': os.environ.get('DB_PORT', '5432'),     # Porta padrão do PostgreSQL
     }
 }
 
