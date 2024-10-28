@@ -25,3 +25,82 @@ class RoomStatusViewTest(TestCase):
 
         # Verificar se a resposta é 404 (Not Found)
         self.assertEqual(response.status_code, 404)
+
+from django.test import TestCase, Client
+from django.urls import reverse
+from django.http import JsonResponse
+import json
+from .models import Room  # Supondo que Room está no mesmo app
+
+class CreateRoomViewTest(TestCase):
+    def setUp(self):
+        self.client = Client()
+        self.url = reverse('new-room')  # Insira o nome correto da rota para CreateRoomView
+
+    def test_create_room_success(self):
+        data = {
+            "createdBy": "user123",
+            "roomName": "Test Room",
+            "roomType": "1",
+            "maxAmountOfPlayers": "4",
+            "privateRoom": "true"
+        }
+        response = self.client.post(self.url, json.dumps(data), content_type="application/json")
+        
+        # Verifica se o status HTTP é 201 (Created)
+        self.assertEqual(response.status_code, 201)
+        
+        # Verifica o conteúdo da resposta
+        response_data = response.json()
+        self.assertIn('roomCode', response_data)
+        self.assertEqual(response['Location'], f"/session/rooms/{response_data['roomCode']}")
+        self.assertEqual(response['userId'], data["createdBy"])
+
+    def test_create_room_missing_fields(self):
+        data = {
+            "createdBy": "user123",
+            "roomName": "Test Room"
+            # Faltando roomType e numberOfPlayers
+        }
+        response = self.client.post(self.url, json.dumps(data), content_type="application/json")
+        
+        # Verifica se o status HTTP é 400 (Bad Request)
+        self.assertEqual(response.status_code, 400)
+        
+        # Verifica o conteúdo da resposta
+        response_data = response.json()
+        self.assertEqual(response_data, {'errorCode': '400', 'message': 'Bad Request'})
+
+    def test_create_room_invalid_room_type_format(self):
+        data = {
+            "createdBy": "user123",
+            "roomName": "Test Room",
+            "roomType": "invalid",  # Valor inválido
+            "maxAmountOfPlayers": "4",
+            "privateRoom": "true"
+        }
+        response = self.client.post(self.url, json.dumps(data), content_type="application/json")
+        
+        # Verifica se o status HTTP é 400 (Bad Request)
+        self.assertEqual(response.status_code, 400)
+        
+        # Verifica o conteúdo da resposta
+        response_data = response.json()
+        self.assertEqual(response_data, {'errorCode': '400', 'message': 'Bad Request'})
+
+    def test_create_room_invalid_number_of_players_format(self):
+        data = {
+            "createdBy": "user123",
+            "roomName": "Test Room",
+            "roomType": "1",  # Valor inválido
+            "maxAmountOfPlayers": "invalid",
+            "privateRoom": "true"
+        }
+        response = self.client.post(self.url, json.dumps(data), content_type="application/json")
+        
+        # Verifica se o status HTTP é 400 (Bad Request)
+        self.assertEqual(response.status_code, 400)
+        
+        # Verifica o conteúdo da resposta
+        response_data = response.json()
+        self.assertEqual(response_data, {'errorCode': '400', 'message': 'Bad Request'})
