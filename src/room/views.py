@@ -3,7 +3,7 @@ import json
 from django.http import JsonResponse
 from django.views import View
 from django.shortcuts import render
-from .models import Room
+from .models import Room, Player
 
 class RoomStatusView(View):
     def get(self, request, roomId):
@@ -45,3 +45,27 @@ class CreateRoomView(View):
         response['userId'] = new_room.createdBy
 
         return response
+
+class MatchPageView(View):
+    def get(self, request, room_code):
+        try:
+            room = Room.objects.get(roomCode=room_code)
+
+            players = Player.objects.filter(roomCode=room.roomCode)
+            players_data = [
+                {
+                    'playerId': player.playerId,
+                    'playerName': player.playerName,
+                    'profileColor': player.profileColor,
+                    'urlProfileImage': player.urlProfileImage
+                }
+                for player in players
+            ]
+            return JsonResponse({'roomCode': room.roomCode, 
+                                 'maxAmountOfPlayers': room.maxAmountOfPlayers,
+                                 'amountOfPlayers': len(players_data),
+                                 'createdBy': room.createdBy,
+                                 'players': players_data
+                                 })
+        except Room.DoesNotExist:
+            return JsonResponse({'errorCode': '404', 'message': 'Room not found'}, status=404)

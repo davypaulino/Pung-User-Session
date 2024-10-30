@@ -2,6 +2,16 @@
 
 from django.db import migrations, models
 
+def matchRoomWithFourPlayers(apps, schema_editor):
+    room = apps.get_model("room", "Room")
+    player = apps.get_model("room", "Player")
+
+    room.objects.get_or_create(id="Room1234", roomName="Sala1234", maxAmountOfPlayers=4, roomCode=1234)
+    player.objects.get_or_create(playerId="P1", playerName="Aurora", roomCode=1234, profileColor=1010, urlProfileImage="templates/1")
+    player.objects.get_or_create(playerId="P2", playerName="Davy", roomCode=1234, profileColor=2020, urlProfileImage="templates/2")
+    player.objects.get_or_create(playerId="P3", playerName="Lucas", roomCode=1234, profileColor=3030, urlProfileImage="templates/3")
+    player.objects.get_or_create(playerId="P4", playerName="Ranna", roomCode=1234, profileColor=4040, urlProfileImage="templates/4")
+    player.objects.get_or_create(playerId="P5", playerName="Bia", roomCode=4321, profileColor=5050, urlProfileImage="templates/5")
 
 class Migration(migrations.Migration):
 
@@ -20,4 +30,5 @@ class Migration(migrations.Migration):
             name="privateRoom",
             field=models.BooleanField(default=False),
         ),
+        migrations.RunPython(matchRoomWithFourPlayers),
     ]

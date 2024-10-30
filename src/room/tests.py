@@ -1,7 +1,8 @@
-from django.test import TestCase
+from django.test import TestCase, Client
 from django.urls import reverse
 from django.http import JsonResponse
-from .models import Room
+import json
+from .models import Room, Player
 
 class RoomStatusViewTest(TestCase):
     def setUp(self):
@@ -25,12 +26,6 @@ class RoomStatusViewTest(TestCase):
 
         # Verificar se a resposta é 404 (Not Found)
         self.assertEqual(response.status_code, 404)
-
-from django.test import TestCase, Client
-from django.urls import reverse
-from django.http import JsonResponse
-import json
-from .models import Room  # Supondo que Room está no mesmo app
 
 class CreateRoomViewTest(TestCase):
     def setUp(self):
@@ -104,3 +99,63 @@ class CreateRoomViewTest(TestCase):
         # Verifica o conteúdo da resposta
         response_data = response.json()
         self.assertEqual(response_data, {'errorCode': '400', 'message': 'Bad Request'})
+
+class RoomDetailViewTest(TestCase):
+    def setUp(self):
+        self.room = Room.objects.create(
+            roomCode="12345",
+            roomName="Sala Teste",
+            roomType=2,
+            maxAmountOfPlayers=2,
+            privateRoom=False,
+            createdBy="Jogador1"
+        )
+
+        self.player1 = Player.objects.create(
+            roomCode=self.room.roomCode,
+            playerId="J1",
+            playerName="Jogador1",
+            profileColor=1010,
+            urlProfileImage="url/template1"
+        )
+        self.player2 = Player.objects.create(
+            roomCode=self.room.roomCode,
+            playerId="J2",
+            playerName="Jogador2",
+            profileColor=2020,
+            urlProfileImage="url/template2"
+        )
+        self.room.amountOfPlayers=2
+
+    def test_get_room_details(self):
+        # Simule uma requisição GET à URL da sala com o roomCode
+        url = reverse('match', args=[self.room.roomCode])
+        response = self.client.get(url)
+
+        # Verifique se a resposta HTTP é 200 (OK)
+        self.assertEqual(response.status_code, 200)
+
+        # Verifique se os dados retornados estão corretos
+        response_data = response.json()
+        
+        # Verifique os dados da sala
+        self.assertEqual(response_data["roomCode"], self.room.roomCode)
+        self.assertEqual(response_data["maxAmountOfPlayers"], self.room.maxAmountOfPlayers)
+        self.assertEqual(response_data["amountOfPlayers"], self.room.amountOfPlayers)
+        self.assertEqual(response_data["createdBy"], self.room.createdBy)
+
+        # Verifique os dados dos jogadores
+        players = response_data["players"]
+        self.assertEqual(len(players), 2)
+
+        # Verifique as informações do primeiro jogador
+        self.assertEqual(players[0]["playerId"], self.player1.playerId)
+        self.assertEqual(players[0]["playerName"], self.player1.playerName)
+        self.assertEqual(players[0]["profileColor"], self.player1.profileColor)
+        self.assertEqual(players[0]["urlProfileImage"], self.player1.urlProfileImage)
+
+        # Verifique as informações do segundo jogador
+        self.assertEqual(players[1]["playerId"], self.player2.playerId)
+        self.assertEqual(players[1]["playerName"], self.player2.playerName)
+        self.assertEqual(players[1]["profileColor"], self.player2.profileColor)
+        self.assertEqual(players[1]["urlProfileImage"], self.player2.urlProfileImage)
