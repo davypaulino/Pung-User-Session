@@ -159,3 +159,69 @@ class RoomDetailViewTest(TestCase):
         self.assertEqual(players[1]["playerName"], self.player2.playerName)
         self.assertEqual(players[1]["profileColor"], self.player2.profileColor)
         self.assertEqual(players[1]["urlProfileImage"], self.player2.urlProfileImage)
+
+from django.test import TestCase
+from django.urls import reverse
+from .models import Room, Player
+
+class AddPlayerToRoomViewTest(TestCase):
+    def setUp(self):
+        # Cria uma sala para os testes
+        self.room = Room.objects.create(
+            roomCode="12345",
+            maxAmountOfPlayers=3,
+            createdBy="Admin"
+        )
+        self.add_player_url = reverse('add-player', args=[self.room.roomCode])  # URL do endpoint PUT
+
+    def test_add_player_successfully(self):
+        # Testa a adição bem-sucedida de um jogador
+        response = self.client.put(
+            self.add_player_url,
+            data={'playerName': 'Player1'},
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 204)
+        self.assertEqual(Player.objects.filter(roomCode=self.room.roomCode).count(), 1)
+        self.assertEqual(Player.objects.first().playerName, "Player1")
+        # self.assertEqual(response.headers.get("playerId"), "Player1")
+
+    def test_add_player_missing_name(self):
+        # Testa a requisição PUT sem o nome do jogador
+        response = self.client.put(
+            self.add_player_url,
+            data={},
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 400)
+
+        response_data = response.json()
+        self.assertEqual(response_data, {'errorCode': '400', 'message': 'Player name is required'})
+
+    def test_add_player_to_full_room(self):
+        # Preenche a sala ao máximo e testa a adição de outro jogador
+        for i in range(self.room.maxAmountOfPlayers):
+            Player.objects.create(playerName=f'Player{i+1}', roomCode=self.room.roomCode)
+
+        response = self.client.put(
+            self.add_player_url,
+            data={'playerName': 'ExtraPlayer'},
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 403)
+
+        response_data = response.json()
+        self.assertEqual(response_data, {'errorCode': '403', 'message': 'Room is full'})
+
+    def test_add_player_to_nonexistent_room(self):
+        # Testa a adição de um jogador a uma sala inexistente
+        nonexistent_room_url = reverse('add-player', args=["99999"])
+        response = self.client.put(
+            nonexistent_room_url,
+            data={'playerName': 'NonExistentRoomPlayer'},
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 404)
+
+        response_data = response.json()
+        self.assertEqual(response_data, {'errorCode': '404', 'message': 'Room not found'})

@@ -51,6 +51,16 @@ class Player(models.Model):
     updatedBy = models.CharField(max_length=64)
     updatedAt = models.DateTimeField(auto_now=True)
 
+    def save(self, *args, **kwargs):
+        if not self.playerId:
+            # Gerar o hash a partir do nome (ou qualquer outra informação que você desejar)
+            hash_input = (self.playerName + str(self.roomCode)).encode('utf-8')
+            self.playerId = hashlib.sha256(hash_input).hexdigest()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return self.playerName
+
 class TotalScores(models.Model):
     playerId = models.CharField(primary_key=True, max_length=64, editable=False)
     score = models.IntegerField(default=0)
