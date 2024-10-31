@@ -40,11 +40,12 @@ class CreateRoomView(View):
             privateRoom=private_room
         )
 
-        response = JsonResponse({'roomCode': new_room.roomCode}, status=201)
-        response['Location'] = f'/session/rooms/{new_room.roomCode}'
-        response['userId'] = new_room.createdBy
-
-        return response
+        return JsonResponse({'roomCode': new_room.roomCode},
+                            status=201,
+                            headers={
+                                'Location': f'/session/rooms/{new_room.roomCode}',
+                                'userId': new_room.createdBy
+                            })
 
 class MatchPageView(View):
     def get(self, request, room_code):
@@ -67,5 +68,33 @@ class MatchPageView(View):
                                  'createdBy': room.createdBy,
                                  'players': players_data
                                  })
+        except Room.DoesNotExist:
+            return JsonResponse({'errorCode': '404', 'message': 'Room not found'}, status=404)
+        
+class AddPlayerToRoomView(View):
+    def put(self, request, room_code):
+        try:
+            data = json.loads(request.body)
+            player_name = data.get("playerName")
+            if not player_name:
+                return JsonResponse({'errorCode': '400', 'message': 'Player name is required'}, status=400)
+
+            room = Room.objects.get(roomCode=room_code)
+
+            if Player.objects.filter(roomCode=room_code).count() >= room.maxAmountOfPlayers:
+                return JsonResponse({'errorCode': '403', 'message': 'Room is full'}, status=403)
+            
+            player = Player.objects.create(
+                playerName=player_name,
+                roomCode=room_code
+                # add profileColor and urlProfileImage
+            )
+            
+            return JsonResponse({},
+                                status=204,
+                                headers={
+                                    'Location': f'/session/rooms/{room_code}',
+                                    'playerId': player.playerId
+                                })
         except Room.DoesNotExist:
             return JsonResponse({'errorCode': '404', 'message': 'Room not found'}, status=404)
