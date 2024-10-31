@@ -27,12 +27,13 @@ class Room(models.Model):
     createdAt = models.DateTimeField(auto_now_add=True)
     updatedBy = models.CharField(max_length=64)
     updatedAt = models.DateTimeField(auto_now=True)
-    gameCode = models.CharField(max_length=64)
+    roomCode = models.CharField(max_length=64)
+    privateRoom = models.BooleanField(default=False)
 
     def save(self, *args, **kwargs):
         if not self.id:
             # Gerar o hash a partir do nome (ou qualquer outra informação que você desejar)
-            hash_input = (self.roomName + self.roomStatus).encode('utf-8')
+            hash_input = (self.roomName + str(self.roomStatus)).encode('utf-8')
             self.id = hashlib.sha256(hash_input).hexdigest()
         super().save(*args, **kwargs)
 
