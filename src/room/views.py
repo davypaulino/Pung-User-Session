@@ -3,7 +3,9 @@ import json
 from django.http import JsonResponse
 from django.views import View
 from django.shortcuts import render
-from .models import Room, Player
+from django.db.models import Q
+from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
+from .models import Room, Player, Match, roomTypes
 
 class RoomStatusView(View):
     def get(self, request, roomId):
@@ -40,19 +42,27 @@ class CreateRoomView(View):
             privateRoom=private_room
         )
 
-        return JsonResponse({'roomCode': new_room.roomCode},
-                            status=201,
-                            headers={
-                                'Location': f'/session/rooms/{new_room.roomCode}',
-                                'userId': new_room.createdBy
-                            })
+        if room_type == roomTypes.MATCH:
+            Match.objects.create(
+                roomCode=new_room.roomCode,
+                maxAmountOfPlayers=max_amount_of_players #matchStatus
+            )
+
+        return JsonResponse(
+            {'roomCode': new_room.roomCode},
+            status=201,
+            headers={
+                'Location': f'/session/rooms/{new_room.roomCode}',
+                'userId': new_room.createdBy
+            }
+        )
 
 class MatchPageView(View):
-    def get(self, request, room_code):
+    def get(self, request, match_id):
         try:
-            room = Room.objects.get(roomCode=room_code)
+            match = Match.objects.get(matchId=match_id)
 
-            players = Player.objects.filter(roomCode=room.roomCode)
+            players = Player.objects.filter(matchId=match.matchId)
             players_data = [
                 {
                     'playerId': player.playerId,
@@ -62,14 +72,17 @@ class MatchPageView(View):
                 }
                 for player in players
             ]
-            return JsonResponse({'roomCode': room.roomCode, 
-                                 'maxAmountOfPlayers': room.maxAmountOfPlayers,
-                                 'amountOfPlayers': len(players_data),
-                                 'createdBy': room.createdBy,
-                                 'players': players_data
-                                 })
+            return JsonResponse(
+                {
+                    'matchId': match.matchId, 
+                    'maxAmountOfPlayers': match.maxAmountOfPlayers,
+                    'amountOfPlayers': len(players_data),
+                    'createdBy': match.createdBy,
+                    'players': players_data
+                }
+            )
         except Room.DoesNotExist:
-            return JsonResponse({'errorCode': '404', 'message': 'Room not found'}, status=404)
+            return JsonResponse({'errorCode': '404', 'message': 'Match not found'}, status=404)
         
 class AddPlayerToRoomView(View):
     def put(self, request, room_code):
@@ -90,11 +103,61 @@ class AddPlayerToRoomView(View):
                 # add profileColor and urlProfileImage
             )
             
-            return JsonResponse({},
-                                status=204,
-                                headers={
-                                    'Location': f'/session/rooms/{room_code}',
-                                    'playerId': player.playerId
-                                })
+            return JsonResponse(
+                {},
+                status=204,
+                headers={
+                    'Location': f'/session/rooms/{room_code}',
+                    'playerId': player.playerId
+                }
+            )
         except Room.DoesNotExist:
             return JsonResponse({'errorCode': '404', 'message': 'Room not found'}, status=404)
+
+class AvailableRoomsView(View):
+    def get(self, request):
+        try:
+            current_page = int(request.GET.get('currentPage', 1))
+        except ValueError:
+            current_page = 1
+        page_size = int(request.GET.get('pageSize', 10))
+        filter_label = request.GET.get('filterLabel', '')
+
+        rooms = Room.objects.all()
+        if filter_label:
+            rooms = rooms.filter(
+                Q(roomName__icontains=filter_label) | Q(roomCode__icontains=filter_label)
+            )
+
+        paginator = Paginator(rooms, page_size)
+        try:
+            paginated_rooms = paginator.page(current_page)
+        except PageNotAnInteger:
+            paginated_rooms = paginator.page(1)
+        except EmptyPage:
+            paginated_rooms = paginator.page(paginator.num_pages)
+
+        data = [
+            {
+                "roomCode": room.roomCode,
+                "amountOfPlayers": room.amountOfPlayers,
+                "maxAmountOfPlayers": room.maxAmountOfPlayers,
+                "roomName": room.roomName,
+                "roomType": room.roomType
+            }
+            for room in paginated_rooms
+        ]
+
+        response = {
+            "paginatedItems": {
+                "currentPage": paginated_rooms.number,
+                "pageSize": page_size,
+                "nextPage": paginated_rooms.next_page_number() if paginated_rooms.has_next() else None,
+                "previousPage": paginated_rooms.previous_page_number() if paginated_rooms.has_previous() else None,
+                "hasNextPage": paginated_rooms.has_next(),
+                "hasPreviousPage": paginated_rooms.has_previous(),
+                "Data": data
+            }
+        }
+
+        return JsonResponse(response)

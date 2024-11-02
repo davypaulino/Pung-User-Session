@@ -2,7 +2,7 @@ from django.test import TestCase, Client
 from django.urls import reverse
 from django.http import JsonResponse
 import json
-from .models import Room, Player
+from .models import Room, Player, Match
 
 class RoomStatusViewTest(TestCase):
     def setUp(self):
@@ -100,19 +100,26 @@ class CreateRoomViewTest(TestCase):
         response_data = response.json()
         self.assertEqual(response_data, {'errorCode': '400', 'message': 'Bad Request'})
 
-class RoomDetailViewTest(TestCase):
+class MatchPageViewTest(TestCase):
     def setUp(self):
         self.room = Room.objects.create(
             roomCode="12345",
             roomName="Sala Teste",
-            roomType=2,
+            roomType=0,
             maxAmountOfPlayers=2,
             privateRoom=False,
             createdBy="Jogador1"
         )
 
+        self.match = Match.objects.create(
+            roomCode=self.room.roomCode,
+            maxAmountOfPlayers=self.room.maxAmountOfPlayers,
+            createdBy=self.room.createdBy
+        )
+
         self.player1 = Player.objects.create(
             roomCode=self.room.roomCode,
+            matchId=self.match.matchId,
             playerId="J1",
             playerName="Jogador1",
             profileColor=1010,
@@ -120,16 +127,17 @@ class RoomDetailViewTest(TestCase):
         )
         self.player2 = Player.objects.create(
             roomCode=self.room.roomCode,
+            matchId=self.match.matchId,
             playerId="J2",
             playerName="Jogador2",
             profileColor=2020,
             urlProfileImage="url/template2"
         )
-        self.room.amountOfPlayers=2
+        self.match.amountOfPlayers=2
 
     def test_get_room_details(self):
         # Simule uma requisição GET à URL da sala com o roomCode
-        url = reverse('match', args=[self.room.roomCode])
+        url = reverse('match', args=[self.match.matchId])
         response = self.client.get(url)
 
         # Verifique se a resposta HTTP é 200 (OK)
@@ -139,10 +147,10 @@ class RoomDetailViewTest(TestCase):
         response_data = response.json()
         
         # Verifique os dados da sala
-        self.assertEqual(response_data["roomCode"], self.room.roomCode)
-        self.assertEqual(response_data["maxAmountOfPlayers"], self.room.maxAmountOfPlayers)
-        self.assertEqual(response_data["amountOfPlayers"], self.room.amountOfPlayers)
-        self.assertEqual(response_data["createdBy"], self.room.createdBy)
+        self.assertEqual(response_data["matchId"], self.match.matchId)
+        self.assertEqual(response_data["maxAmountOfPlayers"], self.match.maxAmountOfPlayers)
+        self.assertEqual(response_data["amountOfPlayers"], self.match.amountOfPlayers)
+        self.assertEqual(response_data["createdBy"], self.match.createdBy)
 
         # Verifique os dados dos jogadores
         players = response_data["players"]
@@ -159,10 +167,6 @@ class RoomDetailViewTest(TestCase):
         self.assertEqual(players[1]["playerName"], self.player2.playerName)
         self.assertEqual(players[1]["profileColor"], self.player2.profileColor)
         self.assertEqual(players[1]["urlProfileImage"], self.player2.urlProfileImage)
-
-from django.test import TestCase
-from django.urls import reverse
-from .models import Room, Player
 
 class AddPlayerToRoomViewTest(TestCase):
     def setUp(self):
@@ -225,3 +229,65 @@ class AddPlayerToRoomViewTest(TestCase):
 
         response_data = response.json()
         self.assertEqual(response_data, {'errorCode': '404', 'message': 'Room not found'})
+
+class AvailableRoomsViewTest(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.rooms = [
+            Room.objects.create(roomCode=f"room{i}", roomName=f"Room {i}", maxAmountOfPlayers=4, roomType=1)
+            for i in range(15)
+        ]
+        cls.url = reverse("available-rooms")  # URL da view
+
+    def test_first_page_no_filter(self):
+        # Testa a primeira página sem filtros
+        response = self.client.get(self.url, {"currentPage": 1, "pageSize": 5})
+        self.assertEqual(response.status_code, 200)
+        data = response.json()["paginatedItems"]
+        self.assertEqual(data["currentPage"], 1)
+        self.assertEqual(len(data["Data"]), 5)  # Deve retornar 5 salas
+
+    def test_pagination_with_multiple_pages(self):
+        # Testa a segunda página e verifica a paginação
+        response = self.client.get(self.url, {"currentPage": 2, "pageSize": 5})
+        data = response.json()["paginatedItems"]
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(data["currentPage"], 2)
+        self.assertTrue(data["hasPreviousPage"])
+        self.assertTrue(data["hasNextPage"])
+        self.assertEqual(len(data["Data"]), 5)
+
+    def test_filter_by_room_name(self):
+        # Testa a filtragem pelo nome da sala
+        response = self.client.get(self.url, {"currentPage": 1, "pageSize": 5, "filterLabel": "Room 1"})
+        data = response.json()["paginatedItems"]
+        self.assertEqual(response.status_code, 200)
+        # Confirma se apenas salas com "Room 1" no nome foram retornadas
+        for room in data["Data"]:
+            self.assertIn("Room 1", room["roomName"])
+
+    def test_filter_by_room_code(self):
+        # Testa a filtragem pelo código da sala
+        response = self.client.get(self.url, {"currentPage": 1, "pageSize": 5, "filterLabel": "room1"})
+        data = response.json()["paginatedItems"]
+        self.assertEqual(response.status_code, 200)
+        # Confirma se apenas salas com "room1" no código foram retornadas
+        for room in data["Data"]:
+            self.assertIn("room1", room["roomCode"])
+
+    def test_out_of_range_page(self):
+        # Testa uma página fora do intervalo (espera a última página)
+        response = self.client.get(self.url, {"currentPage": 10, "pageSize": 5})
+        data = response.json()["paginatedItems"]
+        self.assertEqual(response.status_code, 200)
+        last_page = (Room.objects.count() - 1) // 5 + 1  # Calcula o número total de páginas dinamicamente
+        self.assertEqual(data["currentPage"], last_page)
+        self.assertFalse(data["hasNextPage"])
+
+    def test_invalid_page(self):
+        # Testa uma página com valor inválido (não numérico)
+        response = self.client.get(self.url, {"currentPage": "invalid", "pageSize": 5})
+        data = response.json()["paginatedItems"]
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(data["currentPage"], 1)  # Deve voltar para a primeira página
+        self.assertTrue(data["hasNextPage"])
