@@ -40,10 +40,32 @@ class Room(models.Model):
     def __str__(self):
         return self.roomName
 
+class Match(models.Model):
+    matchId = models.CharField(primary_key=True, max_length=64, editable=False)
+    roomCode = models.CharField(max_length=64)
+    maxAmountOfPlayers = models.IntegerField(default=1)
+    amountOfPlayers = models.IntegerField(default=1)
+    matchStatus = models.IntegerField(default=0)
+    matchWinner = models.CharField(max_length=100)
+    createdBy = models.CharField(max_length=64)
+    createdAt = models.DateTimeField(auto_now_add=True)
+    updatedBy = models.CharField(max_length=64)
+    updatedAt = models.DateTimeField(auto_now=True)
+
+    def save(self, *args, **kwargs):
+        if not self.matchId:
+            hash_input = (self.roomCode + str(self.matchStatus)).encode('utf-8')
+            self.matchId = hashlib.sha256(hash_input).hexdigest()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return self.matchId
+
 class Player(models.Model):
     playerId = models.CharField(primary_key=True, max_length=64, editable=False)
     playerName = models.CharField(max_length=100)
     roomCode = models.CharField(max_length=64)
+    matchId = models.CharField(max_length=64, default=0)
     profileColor = models.IntegerField(default=0)
     urlProfileImage = models.CharField(max_length=100)
     createdBy = models.CharField(max_length=64)
