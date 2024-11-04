@@ -52,7 +52,7 @@ class CreateRoomView(View):
             {'roomCode': new_room.roomCode},
             status=201,
             headers={
-                'Location': f'/session/rooms/{new_room.room_code}',
+                'Location': f'/session/rooms/{new_room.roomCode}',
                 'userId': new_room.createdBy
             }
         )
