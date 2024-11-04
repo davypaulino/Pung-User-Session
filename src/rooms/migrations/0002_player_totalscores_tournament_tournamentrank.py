@@ -4,7 +4,7 @@ from django.db import migrations, models
 
 def create_initial_rooms(apps, schema_editor):
     # Obter o modelo Room de forma dinâmica para evitar problemas de importação direta
-    ctxRoom = apps.get_model("room", "Room")
+    ctxRoom = apps.get_model("rooms", "Room")
 
     # Criar ou obter dados iniciais
     ctxRoom.objects.get_or_create(id="Room1", defaults={"roomName": "Sala1", "roomStatus": 0})
@@ -14,7 +14,7 @@ def create_initial_rooms(apps, schema_editor):
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("room", "0001_initial"),
+        ("rooms", "0001_initial"),
     ]
 
     operations = [

@@ -2,7 +2,7 @@ import json
 
 from django.http import JsonResponse
 from django.views import View
-from django.shortcuts import render
+from django.shortcuts import get_object_or_404
 from django.db.models import Q
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from .models import Room, Player, Match, roomTypes
@@ -42,11 +42,17 @@ class CreateRoomView(View):
             privateRoom=private_room
         )
 
+        new_player = Player.objects.create(
+            playerName=created_by,
+            roomCode=new_room.roomCode
+        )
+        
         if room_type == roomTypes.MATCH:
-            Match.objects.create(
+            match = Match.objects.create(
                 roomCode=new_room.roomCode,
                 maxAmountOfPlayers=max_amount_of_players #matchStatus
             )
+            new_player.matchId=match.matchId
 
         return JsonResponse(
             {'roomCode': new_room.roomCode},
@@ -123,7 +129,7 @@ class AvailableRoomsView(View):
         page_size = int(request.GET.get('pageSize', 10))
         filter_label = request.GET.get('filterLabel', '')
 
-        rooms = Room.objects.all()
+        rooms = Room.objects.all().order_by('roomName')
         if filter_label:
             rooms = rooms.filter(
                 Q(roomName__icontains=filter_label) | Q(roomCode__icontains=filter_label)
@@ -156,8 +162,32 @@ class AvailableRoomsView(View):
                 "previousPage": paginated_rooms.previous_page_number() if paginated_rooms.has_previous() else None,
                 "hasNextPage": paginated_rooms.has_next(),
                 "hasPreviousPage": paginated_rooms.has_previous(),
+                "totalPages": paginated_rooms.count(),
                 "Data": data
             }
         }
 
         return JsonResponse(response)
+
+class RemovePlayerView(View):
+    def delete(self, request, room_code, player_id):
+        try:
+            room = Room.objects.get(roomCode=room_code)
+        except Room.DoesNotExist:
+            return JsonResponse({'errorCode': '404', 'message': 'Room not found'}, status=404)
+
+        try:
+            player = Player.objects.get(playerId=player_id, roomCode=room_code)
+        except Player.DoesNotExist:
+            return JsonResponse({"errorCode": "404", "message": "Player not found in the room"}, status=404)
+
+        player.delete()
+
+        return JsonResponse(
+            {},
+            status=204,
+            headers={
+                'Location': f'/session/rooms/{room_code}/{player_id}',
+                'playerId': player_id
+            }
+        )
