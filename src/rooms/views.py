@@ -154,6 +154,9 @@ class AvailableRoomsView(View):
             for room in paginated_rooms
         ]
 
+        total_items = rooms.count()
+        total_pages = (total_items + page_size - 1) // page_size
+
         response = {
             "paginatedItems": {
                 "currentPage": paginated_rooms.number,
@@ -162,7 +165,7 @@ class AvailableRoomsView(View):
                 "previousPage": paginated_rooms.previous_page_number() if paginated_rooms.has_previous() else None,
                 "hasNextPage": paginated_rooms.has_next(),
                 "hasPreviousPage": paginated_rooms.has_previous(),
-                "totalPages": paginated_rooms.count(),
+                "totalPages": total_pages,
                 "Data": data
             }
         }
