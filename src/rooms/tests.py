@@ -291,3 +291,53 @@ class AvailableRoomsViewTest(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(data["currentPage"], 1)  # Deve voltar para a primeira página
         self.assertTrue(data["hasNextPage"])
+
+class RemovePlayerViewTest(TestCase):
+    
+    def setUp(self):
+        self.room = Room.objects.create(
+            roomName="Test Room",
+            maxAmountOfPlayers=4,
+            amountOfPlayers=1,
+            roomType=0,
+            roomStatus=0,
+            createdBy="Test Creator",
+            roomCode="room123"
+        )
+
+        self.player = Player.objects.create(
+            playerId="player123",
+            roomCode=self.room.roomCode
+        )
+
+    def test_remove_player_success(self):
+        response = self.client.delete(
+            reverse('remove-player', args=[self.room.roomCode, self.player.playerId])
+        )
+        
+        self.assertEqual(response.status_code, 204)
+        self.assertEqual(Player.objects.filter(playerId=self.player.playerId).count(), 0)
+
+    def test_remove_player_not_found(self):
+        """Testa a tentativa de remover um jogador que não existe."""
+        response = self.client.delete(
+            reverse('remove-player', args=[self.room.roomCode, "non_existent_player"])
+        )
+        
+        self.assertEqual(response.status_code, 404)
+        response_data = response.json()
+        self.assertEqual(response_data, {"errorCode": "404", "message": "Player not found in the room"})
+
+    def test_remove_player_room_not_found(self):
+        """Testa a tentativa de remover um jogador de uma sala que não existe."""
+        response = self.client.delete(
+            reverse('remove-player', args=["non_existent_room", self.player.playerId])
+        )
+        
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.json(), {"errorCode": "404", "message": "Room not found"})
+
+    def tearDown(self):
+        """Limpa o banco de dados após os testes."""
+        self.player.delete()
+        self.room.delete()

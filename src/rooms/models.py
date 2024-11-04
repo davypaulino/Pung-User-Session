@@ -1,6 +1,19 @@
+import hashlib
+import uuid
+
+from django.core.exceptions import ObjectDoesNotExist
 from django.db import models
 from enum import Enum
-import hashlib
+
+def generate_unique_id(model):
+    id = str(uuid.uuid4().int)
+    return id
+
+def generate_unique_code(model):
+    while True:
+        code = str(uuid.uuid4().int)[:8]
+        if not model.objects.filter(roomCode=code).exists():
+            return code
 
 class roomTypes(Enum):
     MATCH = 0
@@ -32,9 +45,13 @@ class Room(models.Model):
 
     def save(self, *args, **kwargs):
         if not self.id:
-            # Gerar o hash a partir do nome (ou qualquer outra informação que você desejar)
-            hash_input = (self.roomName + str(self.roomStatus)).encode('utf-8')
-            self.id = hashlib.sha256(hash_input).hexdigest()
+            self.id = str(uuid.uuid4().int)
+        if not self.roomCode:
+            while True:
+                code = str(uuid.uuid4().int)[:8]
+                if not Room.objects.filter(roomCode=code).exists():
+                    self.roomCode = code
+                    break
         super().save(*args, **kwargs)
 
     def __str__(self):
@@ -54,8 +71,7 @@ class Match(models.Model):
 
     def save(self, *args, **kwargs):
         if not self.matchId:
-            hash_input = (self.roomCode + str(self.matchStatus)).encode('utf-8')
-            self.matchId = hashlib.sha256(hash_input).hexdigest()
+            self.matchId = str(uuid.uuid4().int)
         super().save(*args, **kwargs)
 
     def __str__(self):
@@ -75,9 +91,7 @@ class Player(models.Model):
 
     def save(self, *args, **kwargs):
         if not self.playerId:
-            # Gerar o hash a partir do nome (ou qualquer outra informação que você desejar)
-            hash_input = (self.playerName + str(self.roomCode)).encode('utf-8')
-            self.playerId = hashlib.sha256(hash_input).hexdigest()
+            self.playerId = str(uuid.uuid4().int)
         super().save(*args, **kwargs)
 
     def __str__(self):

@@ -3,7 +3,7 @@
 from django.db import migrations, models
 
 def checkAvailableRooms(apps, schema_editor):
-    room = apps.get_model("room", "Room")
+    room = apps.get_model("rooms", "Room")
 
     room.objects.get_or_create(id="Room4", roomName="Sala4", maxAmountOfPlayers=4, roomCode=4)
     room.objects.get_or_create(id="Room5", roomName="Sala5", maxAmountOfPlayers=4, roomCode=5)
@@ -21,7 +21,7 @@ def checkAvailableRooms(apps, schema_editor):
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("room", "0003_rename_gamecode_room_roomcode_room_privateroom"),
+        ("rooms", "0003_rename_gamecode_room_roomcode_room_privateroom"),
     ]
 
     operations = [

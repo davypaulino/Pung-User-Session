@@ -3,8 +3,8 @@
 from django.db import migrations, models
 
 def matchRoomWithFourPlayers(apps, schema_editor):
-    room = apps.get_model("room", "Room")
-    player = apps.get_model("room", "Player")
+    room = apps.get_model("rooms", "Room")
+    player = apps.get_model("rooms", "Player")
 
     room.objects.get_or_create(id="Room1234", roomName="Sala1234", maxAmountOfPlayers=4, roomCode=1234)
     player.objects.get_or_create(playerId="P1", playerName="Aurora", roomCode=1234, profileColor=1010, urlProfileImage="templates/1")
@@ -16,7 +16,7 @@ def matchRoomWithFourPlayers(apps, schema_editor):
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("room", "0002_player_totalscores_tournament_tournamentrank"),
+        ("rooms", "0002_player_totalscores_tournament_tournamentrank"),
     ]
 
     operations = [
