@@ -10,7 +10,7 @@ all:
 	@echo Hello
 
 run:
-	@uvicorn userSession.asgi:application --host 0.0.0.0 --port 8081 --reload
+	@python3 manage.py runserver localhost:8082
 
 $(VENV_NAME):
 	@echo -e "$(BLUE)🔨 Building VENV: [$(VENV_NAME)]...$(RESET)" 
