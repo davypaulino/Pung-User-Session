@@ -15,6 +15,8 @@ class RoomStatusView(View):
         except Room.DoesNotExist:
             return JsonResponse({'errorCode': '404', 'message': 'Room status not found'}, status=404)
 
+
+
 class CreateRoomView(View):
     def post(self, request, *args, **kwargs):
         data = json.loads(request.body)
@@ -35,7 +37,6 @@ class CreateRoomView(View):
             return JsonResponse({'errorCode': '400', 'message': 'Bad Request'}, status=400)
 
         new_room = Room.objects.create(
-            createdBy=created_by,
             roomName=room_name,
             roomType=room_type,
             maxAmountOfPlayers=max_amount_of_players,
@@ -44,15 +45,19 @@ class CreateRoomView(View):
 
         new_player = Player.objects.create(
             playerName=created_by,
-            roomCode=new_room.roomCode
+            roomCode=new_room.roomCode,
+            matchId=new_room.id,
         )
-        
-        if room_type == roomTypes.MATCH:
-            match = Match.objects.create(
-                roomCode=new_room.roomCode,
-                maxAmountOfPlayers=max_amount_of_players #matchStatus
-            )
-            new_player.matchId=match.matchId
+
+        new_room.createdBy = new_player.playerId
+        new_room.save()
+
+        # if room_type == roomTypes.MATCH:
+        #     match = Match.objects.create(
+        #         roomCode=new_room.roomCode,
+        #         maxAmountOfPlayers=max_amount_of_players #matchStatus
+        #     )
+        #     new_player.matchId=match.matchId
 
         return JsonResponse(
             {'roomCode': new_room.roomCode},
@@ -66,25 +71,26 @@ class CreateRoomView(View):
 class MatchPageView(View):
     def get(self, request, match_id):
         try:
-            match = Match.objects.get(matchId=match_id)
+            match = Room.objects.get(roomCode=match_id)
 
-            players = Player.objects.filter(matchId=match.matchId)
+            players = Player.objects.filter(matchId=match.id)
             players_data = [
                 {
-                    'playerId': player.playerId,
-                    'playerName': player.playerName,
+                    'id': player.playerId,
+                    'name': player.playerName,
                     'profileColor': player.profileColor,
-                    'urlProfileImage': player.urlProfileImage
+                    'urlProfileImage': player.urlProfileImage,
+                    "owner": player.playerId == match.createdBy,
                 }
                 for player in players
             ]
             return JsonResponse(
                 {
-                    'matchId': match.matchId, 
+                    'matchId': match.id, 
                     'maxAmountOfPlayers': match.maxAmountOfPlayers,
                     'amountOfPlayers': len(players_data),
                     'createdBy': match.createdBy,
-                    'players': players_data
+                    'players': players_data,
                 }
             )
         except Room.DoesNotExist:
