@@ -45,15 +45,11 @@ class Room(models.Model):
 
     def save(self, *args, **kwargs):
         if not self.id:
-            self.id = str(uuid.uuid4().int)
+            self.id = str(uuid.uuid4())
         if not self.roomCode:
-            while True:
-                code = str(uuid.uuid4().int)[:8]
-                if not Room.objects.filter(roomCode=code).exists():
-                    self.roomCode = code
-                    break
+            self.roomCode = str(self.id)[:8]
         super().save(*args, **kwargs)
-
+        
     def __str__(self):
         return self.roomName
 
@@ -88,6 +84,7 @@ class Player(models.Model):
     createdAt = models.DateTimeField(auto_now_add=True)
     updatedBy = models.CharField(max_length=64)
     updatedAt = models.DateTimeField(auto_now=True)
+    status = models.BooleanField(default=True)
 
     def save(self, *args, **kwargs):
         if not self.playerId:

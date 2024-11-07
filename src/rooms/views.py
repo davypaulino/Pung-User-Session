@@ -15,8 +15,6 @@ class RoomStatusView(View):
         except Room.DoesNotExist:
             return JsonResponse({'errorCode': '404', 'message': 'Room status not found'}, status=404)
 
-
-
 class CreateRoomView(View):
     def post(self, request, *args, **kwargs):
         data = json.loads(request.body)
@@ -40,7 +38,7 @@ class CreateRoomView(View):
             roomName=room_name,
             roomType=room_type,
             maxAmountOfPlayers=max_amount_of_players,
-            privateRoom=private_room
+            privateRoom=private_room,
         )
 
         new_player = Player.objects.create(
@@ -67,34 +65,6 @@ class CreateRoomView(View):
                 'userId': new_room.createdBy
             }
         )
-
-class MatchPageView(View):
-    def get(self, request, match_id):
-        try:
-            match = Room.objects.get(roomCode=match_id)
-
-            players = Player.objects.filter(matchId=match.id)
-            players_data = [
-                {
-                    'id': player.playerId,
-                    'name': player.playerName,
-                    'profileColor': player.profileColor,
-                    'urlProfileImage': player.urlProfileImage,
-                    "owner": player.playerId == match.createdBy,
-                }
-                for player in players
-            ]
-            return JsonResponse(
-                {
-                    'matchId': match.id, 
-                    'maxAmountOfPlayers': match.maxAmountOfPlayers,
-                    'amountOfPlayers': len(players_data),
-                    'createdBy': match.createdBy,
-                    'players': players_data,
-                }
-            )
-        except Room.DoesNotExist:
-            return JsonResponse({'errorCode': '404', 'message': 'Match not found'}, status=404)
         
 class AddPlayerToRoomView(View):
     def put(self, request, room_code):
@@ -126,7 +96,30 @@ class AddPlayerToRoomView(View):
         except Room.DoesNotExist:
             return JsonResponse({'errorCode': '404', 'message': 'Room not found'}, status=404)
 
-class AvailableRoomsView(View):
+class RemovePlayerView(View):
+    def delete(self, request, room_code, player_id):
+        try:
+            room = Room.objects.get(roomCode=room_code)
+        except Room.DoesNotExist:
+            return JsonResponse({'errorCode': '404', 'message': 'Room not found'}, status=404)
+
+        try:
+            player = Player.objects.get(playerId=player_id, roomCode=room_code)
+        except Player.DoesNotExist:
+            return JsonResponse({"errorCode": "404", "message": "Player not found in the room"}, status=404)
+
+        player.delete()
+
+        return JsonResponse(
+            {},
+            status=204,
+            headers={
+                'Location': f'/session/rooms/{room_code}/{player_id}',
+                'playerId': player_id
+            }
+        )
+
+class RoomGetView(View):
     def get(self, request):
         try:
             current_page = int(request.GET.get('currentPage', 1))
@@ -178,25 +171,61 @@ class AvailableRoomsView(View):
 
         return JsonResponse(response)
 
-class RemovePlayerView(View):
-    def delete(self, request, room_code, player_id):
+class RoomView(View):
+
+    def delete(self, request, roomCode):
+        room = Room.objects.filter(roomCode=roomCode).first()
+        if room is None:
+            return JsonResponse({}, status=204)
+        players = Player.objects.filter(roomCode=roomCode)
+        players.delete()
+        room.delete()
+        return JsonResponse({}, status=200)
+
+    def get(self, request, match_id):
         try:
-            room = Room.objects.get(roomCode=room_code)
+            match = Room.objects.get(roomCode=match_id)
+
+            players = Player.objects.filter(matchId=match.id)
+            players_data = [
+                {
+                    'id': player.playerId,
+                    'name': player.playerName,
+                    'profileColor': player.profileColor,
+                    'urlProfileImage': player.urlProfileImage,
+                    "owner": player.playerId == match.createdBy,
+                }
+                for player in players
+            ]
+            return JsonResponse(
+                {
+                    'matchId': match.id, 
+                    'maxAmountOfPlayers': match.maxAmountOfPlayers,
+                    'amountOfPlayers': len(players_data),
+                    'createdBy': match.createdBy,
+                    'players': players_data,
+                }
+            )
         except Room.DoesNotExist:
-            return JsonResponse({'errorCode': '404', 'message': 'Room not found'}, status=404)
+            return JsonResponse({'errorCode': '404', 'message': 'Match not found'}, status=404)
 
-        try:
-            player = Player.objects.get(playerId=player_id, roomCode=room_code)
-        except Player.DoesNotExist:
-            return JsonResponse({"errorCode": "404", "message": "Player not found in the room"}, status=404)
-
-        player.delete()
-
+class PlayerView(View):
+    
+    def get(self, request, id):
+        player = Player.objects.filter(playerId=id, status=True).first()
+        if player is None:
+            return JsonResponse({}, status=204)
+        
+        room = Room.objects.filter(roomCode=player.roomCode).first()
+        if room is None or player.status == False:
+            return JsonResponse({}, status=204)
+        
         return JsonResponse(
-            {},
-            status=204,
-            headers={
-                'Location': f'/session/rooms/{room_code}/{player_id}',
-                'playerId': player_id
-            }
+            {
+                "roomCode": room.roomCode,
+                "roomStatus": room.roomStatus,
+                "GameCode": room.GameCode,
+            },
+            status=200,
         )
+
