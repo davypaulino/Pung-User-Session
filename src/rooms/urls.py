@@ -1,11 +1,13 @@
 from django.urls import path
-from .views import RoomStatusView, CreateRoomView, MatchPageView, AddPlayerToRoomView, AvailableRoomsView, RemovePlayerView
+from .views import RoomStatusView, CreateRoomView, AddPlayerToRoomView, RoomView, RoomGetView, RemovePlayerView, PlayerView
 
 urlpatterns = [
-    path('<str:roomId>/status/', RoomStatusView.as_view(), name='room_status'),
-    path('new-room/', CreateRoomView.as_view(), name='new-room'),
-    path('<str:match_id>/', MatchPageView.as_view(), name='match'),
-    path('<str:room_code>/add-player/', AddPlayerToRoomView.as_view(), name='add-player'),
-    path('', AvailableRoomsView.as_view(), name='available-rooms'),
-    path('remove-player/<str:room_code>/<str:player_id>/', RemovePlayerView.as_view(), name='remove-player')
+    path('rooms/', RoomGetView.as_view(), name='rooms'),
+    path('rooms/new-room/', CreateRoomView.as_view(), name='new-room'),
+    path('rooms/<str:roomCode>/delete', RoomView.as_view(), name='rooms'),
+    path('rooms/<str:match_id>/detail/', RoomView.as_view(), name='match'),
+    path('rooms/<str:roomId>/status/', RoomStatusView.as_view(), name='room_status'),
+    path('rooms/<str:room_code>/add-player/', AddPlayerToRoomView.as_view(), name='add-player'),
+    path('rooms/remove-player/<str:room_code>/<str:player_id>/', RemovePlayerView.as_view(), name='remove-player'),
+    path('players/<str:id>/', PlayerView.as_view(), name='get-player')
 ]
