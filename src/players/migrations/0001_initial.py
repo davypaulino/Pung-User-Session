@@ -12,16 +12,14 @@ class Migration(migrations.Migration):
 
     operations = [
         migrations.CreateModel(
-            name='Room',
+            name='Player',
             fields=[
                 ('id', models.CharField(editable=False, max_length=64, primary_key=True, serialize=False)),
-                ('code', models.CharField(max_length=64)),
                 ('name', models.CharField(max_length=100)),
-                ('maxAmountOfPlayers', models.IntegerField(default=2)),
-                ('amountOfPlayers', models.IntegerField(default=1)),
-                ('type', models.IntegerField(default=0)),
-                ('status', models.IntegerField(default=0)),
-                ('privateRoom', models.BooleanField(default=False)),
+                ('roomCode', models.CharField(max_length=64)),
+                ('profileColor', models.IntegerField(default=0)),
+                ('urlProfileImage', models.CharField(max_length=100)),
+                ('status', models.BooleanField(default=True)),
                 ('createdBy', models.CharField(max_length=64)),
                 ('createdAt', models.DateTimeField(auto_now_add=True)),
                 ('updatedBy', models.CharField(max_length=64)),
