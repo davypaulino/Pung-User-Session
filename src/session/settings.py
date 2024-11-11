@@ -36,7 +36,8 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "rooms",
     "players",
-    'corsheaders',
+    "corsheaders",
+    "channels",
 ]
 
 MIDDLEWARE = [
@@ -74,6 +75,12 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "session.wsgi.application"
 
+ASGI_APPLICATION = 'session.asgi.application'
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels.layers.InMemoryChannelLayer",
+    },
+}
 
 # Database
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases
