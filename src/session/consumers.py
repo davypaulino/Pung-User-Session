@@ -21,8 +21,6 @@ class RoomConsumer(AsyncWebsocketConsumer):
         )
 
     async def player_list_update(self, event):
-        players = event["players"]
         await self.send(text_data=json.dumps({
             "type": "player_list_update",
-            "players": players
         }))

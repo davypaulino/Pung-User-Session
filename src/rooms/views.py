@@ -1,6 +1,7 @@
 import json
 
 from django.http import JsonResponse
+from django.http import HttpResponse
 from django.views import View
 from django.shortcuts import get_object_or_404
 from django.db.models import Q
@@ -153,20 +154,16 @@ class RoomStatusView(View):
         except Room.DoesNotExist:
             return JsonResponse({'errorCode': '404', 'message': 'Room status not found'}, status=404)
 
+def update_players_list(room_code):
+    channel_layer = get_channel_layer()
+    async_to_sync(channel_layer.group_send)(
+        f"room_{room_code}",
+        {
+            "type": "player_list_update",
+        }
+    )
+
 class AddPlayerToRoomView(View):
-    def update_players_list(room_code):
-        players = list(Player.objects.filter(roomCode=room_code).values("id"))
-
-        # Enviar a lista atualizada de jogadores para o grupo WebSocket da sala
-        channel_layer = get_channel_layer()
-        async_to_sync(channel_layer.group_send)(
-            f"room_{room_code}",
-            {
-                "type": "player_list_update",
-                "players": players
-            }
-        )
-
     def put(self, request, room_code):
         try:
             data = json.loads(request.body)
@@ -185,20 +182,9 @@ class AddPlayerToRoomView(View):
                 # add profileColor and urlProfileImage
             )
 
-            players = list(Player.objects.filter(roomCode=room_code).values("id"))
+            update_players_list(room_code)
 
-            # Enviar a lista atualizada de jogadores para o grupo WebSocket da sala
-            channel_layer = get_channel_layer()
-            async_to_sync(channel_layer.group_send)(
-                f"room_{room_code}",
-                {
-                    "type": "player_list_update",
-                    "players": players
-                }
-            )
-            
-            return JsonResponse(
-                {},
+            return HttpResponse(
                 status=204,
                 headers={
                     'Location': f'/session/rooms/{room_code}',
@@ -222,8 +208,9 @@ class RemovePlayerView(View):
 
         player.delete()
 
-        return JsonResponse(
-            {},
+        update_players_list(room_code)
+
+        return HttpResponse(
             status=204,
             headers={
                 'Location': f'/session/rooms/{room_code}/{player_id}',
