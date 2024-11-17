@@ -115,6 +115,11 @@ class RoomView(View):
         if room is None:
             return JsonResponse({}, status=204)
         players = Player.objects.filter(roomCode=room_code)
+        channel_layer = get_channel_layer()
+        async_to_sync(channel_layer.group_send)(
+            f"room_{room_code}",
+            { "type": "delete_room" }
+        )
         players.delete()
         room.delete()
         return JsonResponse({}, status=200)
