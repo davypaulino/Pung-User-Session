@@ -36,7 +36,8 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "rooms",
     "players",
-    'corsheaders',
+    "corsheaders",
+    "channels",
 ]
 
 MIDDLEWARE = [
@@ -74,6 +75,16 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "session.wsgi.application"
 
+ASGI_APPLICATION = 'session.asgi.application'
+
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {
+            "hosts": [("redis", 6379)],
+        },
+    },
+}
 
 # Database
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases

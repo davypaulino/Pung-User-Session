@@ -1,10 +1,14 @@
 import json
 
 from django.http import JsonResponse
+from django.http import HttpResponse
 from django.views import View
 from django.shortcuts import get_object_or_404
 from django.db.models import Q
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
+from asgiref.sync import async_to_sync
+from channels.layers import get_channel_layer
+
 from .models import Room, roomTypes
 from players.models import Player
 
@@ -150,6 +154,15 @@ class RoomStatusView(View):
         except Room.DoesNotExist:
             return JsonResponse({'errorCode': '404', 'message': 'Room status not found'}, status=404)
 
+def update_players_list(room_code):
+    channel_layer = get_channel_layer()
+    async_to_sync(channel_layer.group_send)(
+        f"room_{room_code}",
+        {
+            "type": "player_list_update",
+        }
+    )
+
 class AddPlayerToRoomView(View):
     def put(self, request, room_code):
         try:
@@ -168,9 +181,10 @@ class AddPlayerToRoomView(View):
                 roomCode=room_code
                 # add profileColor and urlProfileImage
             )
-            
-            return JsonResponse(
-                {},
+
+            update_players_list(room_code)
+
+            return HttpResponse(
                 status=204,
                 headers={
                     'Location': f'/session/rooms/{room_code}',
@@ -194,8 +208,9 @@ class RemovePlayerView(View):
 
         player.delete()
 
-        return JsonResponse(
-            {},
+        update_players_list(room_code)
+
+        return HttpResponse(
             status=204,
             headers={
                 'Location': f'/session/rooms/{room_code}/{player_id}',
