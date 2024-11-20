@@ -158,6 +158,7 @@ class RoomView(View):
                 {
                     'roomId': room.id,
                     'roomCode': room.code,
+                    'roomName': room.name,
                     'maxAmountOfPlayers': room.maxAmountOfPlayers,
                     'amountOfPlayers': len(players_data),
                     'createdBy': room.createdBy,
