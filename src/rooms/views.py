@@ -10,7 +10,7 @@ from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
 
 from .models import Room, roomTypes
-from players.models import Player
+from players.models import Player, playerColors
 
 class RoomGetView(View):
     def get(self, request):
@@ -64,6 +64,16 @@ class RoomGetView(View):
 
         return JsonResponse(response)
 
+def setPlayerColor(room_code):
+    room = Room.objects.filter(code=room_code).first()
+    profileColor = 0
+    used_colors = Player.objects.filter(roomCode=room_code).values_list('profileColor', flat=True)
+    all_colors = {color.value for color in playerColors}
+    available_colors = all_colors - set(used_colors)
+    if available_colors:
+        profileColor = available_colors.pop()
+    return profileColor
+
 class CreateRoomView(View):
     def post(self, request, *args, **kwargs):
         data = json.loads(request.body)
@@ -95,6 +105,7 @@ class CreateRoomView(View):
         new_player = Player.objects.create(
             name=created_by,
             roomCode=new_room.code,
+            profileColor=setPlayerColor(new_room.code)
         )
 
         new_room.createdBy = new_player.id
@@ -105,7 +116,7 @@ class CreateRoomView(View):
             status=201,
             headers={
                 'Location': f'/session/rooms/{new_room.code}',
-                'userId': new_room.createdBy
+                'X-User-Id': new_room.createdBy,
             }
         )
 
@@ -127,7 +138,11 @@ class RoomView(View):
     def get(self, request, room_code):
         try:
             room = Room.objects.get(code=room_code)
-
+            userId = request.headers.get("X-User-Id")
+            user = Player.objects.filter(roomCode=room.code, id=userId).first()
+            if user is None:
+                return JsonResponse({'errorCode': '403', 'message': 'Forbidden'}, status=403)
+            
             players = Player.objects.filter(roomCode=room.code)
             players_data = [
                 {
@@ -141,11 +156,13 @@ class RoomView(View):
             ]
             return JsonResponse(
                 {
-                    'roomId': room.id, 
+                    'roomId': room.id,
+                    'roomCode': room.code,
                     'maxAmountOfPlayers': room.maxAmountOfPlayers,
                     'amountOfPlayers': len(players_data),
                     'createdBy': room.createdBy,
                     'players': players_data,
+                    'isOwner': userId == room.createdBy,
                 }
             )
         except Room.DoesNotExist:
@@ -159,12 +176,13 @@ class RoomStatusView(View):
         except Room.DoesNotExist:
             return JsonResponse({'errorCode': '404', 'message': 'Room status not found'}, status=404)
 
-def update_players_list(room_code):
+def update_players_list(room_code, userRemoved):
     channel_layer = get_channel_layer()
     async_to_sync(channel_layer.group_send)(
         f"room_{room_code}",
         {
             "type": "player_list_update",
+            "userRemoved": userRemoved,
         }
     )
 
@@ -183,17 +201,18 @@ class AddPlayerToRoomView(View):
             
             player = Player.objects.create(
                 name=player_name,
-                roomCode=room_code
+                roomCode=room_code,
+                profileColor=setPlayerColor(room.code)
                 # add profileColor and urlProfileImage
             )
 
-            update_players_list(room_code)
+            update_players_list(room_code, "")
 
             return HttpResponse(
                 status=204,
                 headers={
                     'Location': f'/session/rooms/{room_code}',
-                    'playerId': player.id
+                    'X-User-Id': player.id
                 }
             )
         except Room.DoesNotExist:
@@ -211,9 +230,9 @@ class RemovePlayerView(View):
         except Player.DoesNotExist:
             return JsonResponse({"errorCode": "404", "message": "Player not found in the room"}, status=404)
 
-        player.delete()
+        update_players_list(room_code, player.id)
 
-        update_players_list(room_code)
+        player.delete()
 
         return HttpResponse(
             status=204,
