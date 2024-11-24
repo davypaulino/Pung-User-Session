@@ -2,6 +2,7 @@ import uuid
 
 from django.db import models
 from enum import Enum
+from rooms.models import Room
 
 class playerColors(Enum):
     RED = 0
@@ -12,6 +13,7 @@ class playerColors(Enum):
 class Player(models.Model):
     id = models.CharField(primary_key=True, max_length=64, editable=False)
     name = models.CharField(max_length=100)
+    roomId = models.ForeignKey(Room, related_name='players', on_delete=models.CASCADE)
     roomCode = models.CharField(max_length=64)
     profileColor = models.IntegerField(choices=[
         (1, "Red"),
@@ -28,7 +30,7 @@ class Player(models.Model):
 
     def save(self, *args, **kwargs):
         if not self.id:
-            self.id = str(uuid.uuid4().int)
+            self.id = str(uuid.uuid4())
         super().save(*args, **kwargs)
 
     def __str__(self):

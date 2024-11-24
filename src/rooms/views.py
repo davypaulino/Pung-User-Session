@@ -101,9 +101,11 @@ class CreateRoomView(View):
         )
 
         room = Room.objects.get(code=new_room.code)
+        room.save()
 
         new_player = Player.objects.create(
             name=created_by,
+            roomId=room,
             roomCode=new_room.code,
             profileColor=setPlayerColor(new_room.code)
         )
@@ -203,6 +205,7 @@ class AddPlayerToRoomView(View):
             player = Player.objects.create(
                 name=player_name,
                 roomCode=room_code,
+                roomId=room,
                 profileColor=setPlayerColor(room.code)
                 # add profileColor and urlProfileImage
             )
