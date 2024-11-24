@@ -31,6 +31,10 @@ class RoomConsumer(AsyncWebsocketConsumer):
         await self.send(text_data=json.dumps({
             "type": "delete_room",
         }))
+        
+    async def game_started(self, event):
+        ##logger.info(f"Starting | {GameSessionConsumer.__name__} | game_update | User {self.userId} send a movement to {self.gameId}.")
+        await self.send(text_data=json.dumps(event))
 
 class PlayerScoreConsumer(AsyncWebsocketConsumer):
     async def connect(self):
@@ -51,4 +55,3 @@ class PlayerScoreConsumer(AsyncWebsocketConsumer):
         )
 
     async def update_score(self, event):
-        await self.send(text_data=json.dumps(event))

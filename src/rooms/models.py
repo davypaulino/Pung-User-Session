@@ -39,6 +39,8 @@ class Room(models.Model):
     updatedAt = models.DateTimeField(auto_now=True)
 
     def save(self, *args, **kwargs):
+        if isinstance(self.status, RoomStatus):
+            self.status = self.status.value 
         if not self.id:
             self.id = str(uuid.uuid4())
         if not self.code:
