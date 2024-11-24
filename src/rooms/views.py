@@ -21,7 +21,7 @@ class RoomGetView(View):
         page_size = int(request.GET.get('pageSize', 10))
         filter_label = request.GET.get('filterLabel', '')
 
-        rooms = Room.objects.all().order_by('name')
+        rooms = Room.objects.filter(privateRoom=False).order_by('name')
         if filter_label:
             rooms = rooms.filter(
                 Q(name__icontains=filter_label) | Q(code__icontains=filter_label)
@@ -82,7 +82,7 @@ class CreateRoomView(View):
         room_name = data.get("roomName")
         room_type = data.get("roomType")
         max_amount_of_players = data.get("maxAmountOfPlayers")
-        private_room = data.get("privateRoom") == "true"
+        private_room = data.get("privateRoom") is True
 
         if not (created_by and room_name and room_type and max_amount_of_players):
             return JsonResponse({'errorCode': '400', 'message': 'Bad Request'}, status=400)

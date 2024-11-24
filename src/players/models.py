@@ -22,6 +22,7 @@ class Player(models.Model):
         (4, "Yellow"),
     ], default=0)
     urlProfileImage = models.CharField(max_length=100)
+    score = models.IntegerField(default=0)
     status = models.BooleanField(default=True)
     createdBy = models.CharField(max_length=64)
     createdAt = models.DateTimeField(auto_now_add=True)
