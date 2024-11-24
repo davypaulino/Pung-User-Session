@@ -51,6 +51,4 @@ class PlayerScoreConsumer(AsyncWebsocketConsumer):
         )
 
     async def update_score(self, event):
-        await self.send(text_data=json.dumps({
-            "type": "update_score",
-        }))
+        await self.send(text_data=json.dumps(event))
