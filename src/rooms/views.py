@@ -1,15 +1,16 @@
 import json
+import random
 
 from django.http import JsonResponse
 from django.http import HttpResponse
 from django.views import View
 from django.shortcuts import get_object_or_404
-from django.db.models import Q
+from django.db.models import F, Q
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
 
-from .models import Room, roomTypes
+from .models import Room, roomTypes, RoomStatus
 from players.models import Player, playerColors
 
 class RoomGetView(View):
@@ -21,7 +22,7 @@ class RoomGetView(View):
         page_size = int(request.GET.get('pageSize', 10))
         filter_label = request.GET.get('filterLabel', '')
 
-        rooms = Room.objects.filter(privateRoom=False).order_by('name')
+        rooms = Room.objects.filter(privateRoom=False, amountOfPlayers__lt=F('maxAmountOfPlayers'), status__lt=RoomStatus.READY_FOR_START.value).order_by('name')
         if filter_label:
             rooms = rooms.filter(
                 Q(name__icontains=filter_label) | Q(code__icontains=filter_label)
@@ -100,17 +101,16 @@ class CreateRoomView(View):
             privateRoom=private_room,
         )
 
-        room = Room.objects.get(code=new_room.code)
-        room.save()
-
         new_player = Player.objects.create(
             name=created_by,
-            roomId=room,
+            roomId=new_room,
             roomCode=new_room.code,
-            profileColor=setPlayerColor(new_room.code)
+            profileColor=setPlayerColor(new_room.code),
+            urlProfileImage=f"/assets/img/{random.choice([1, 2])}.png"
         )
 
         new_room.createdBy = new_player.id
+        new_room.amountOfPlayers += 1
         new_room.save()
 
         return JsonResponse(
@@ -206,10 +206,11 @@ class AddPlayerToRoomView(View):
                 name=player_name,
                 roomCode=room_code,
                 roomId=room,
-                profileColor=setPlayerColor(room.code)
-                # add profileColor and urlProfileImage
+                profileColor=setPlayerColor(room.code),
+                urlProfileImage=f"/assets/img/{random.choice([1, 2])}.png"
             )
-
+            room.amountOfPlayers += 1
+            room.save()
             update_players_list(room_code, "")
 
             return HttpResponse(
@@ -237,6 +238,8 @@ class RemovePlayerView(View):
         update_players_list(room_code, player.id)
 
         player.delete()
+        room.amountOfPlayers -= 1
+        room.save()
 
         return HttpResponse(
             status=204,
