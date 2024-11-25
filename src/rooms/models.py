@@ -25,13 +25,29 @@ class RoomStatus(Enum):
     GAME_ENDED = 7
 
 class Room(models.Model):
+    TYPE_CHOICES = [
+        (0, "Match"),
+        (1, "Tournament"),
+    ]
+
+    STATUS_CHOICES = [
+        (0, "Creating Room"),
+        (1, "Room Created"),
+        (2, "Waiting Minimal Amount of Players"),
+        (3, "Ready for Start"),
+        (4, "Creating Game"),
+        (5, "Game Created"),
+        (6, "Game Started"),
+        (7, "Game Ended"),
+    ]
+
     id = models.CharField(primary_key=True, max_length=64, editable=False)
     code = models.CharField(max_length=64)
     name = models.CharField(max_length=100)
     maxAmountOfPlayers = models.IntegerField(default=2)
-    amountOfPlayers = models.IntegerField(default=1)
-    type = models.IntegerField(default=0)
-    status = models.IntegerField(default=0)
+    amountOfPlayers = models.IntegerField(default=0)
+    type = models.IntegerField(choices=TYPE_CHOICES, default=0)
+    status = models.IntegerField(choices=STATUS_CHOICES, default=0)
     privateRoom = models.BooleanField(default=False)
     createdBy = models.CharField(max_length=64)
     createdAt = models.DateTimeField(auto_now_add=True)

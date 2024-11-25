@@ -1,6 +1,9 @@
 import json
 
 from channels.generic.websocket import AsyncWebsocketConsumer
+from games.models import GameModel as Game
+from rooms.models import Room
+from asgiref.sync import sync_to_async
 
 class RoomConsumer(AsyncWebsocketConsumer):
     async def connect(self):
@@ -55,3 +58,4 @@ class PlayerScoreConsumer(AsyncWebsocketConsumer):
         )
 
     async def update_score(self, event):
+        await self.send(text_data=json.dumps(event))
