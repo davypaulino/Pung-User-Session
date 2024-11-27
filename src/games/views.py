@@ -15,7 +15,7 @@ class GameView(View):
             return HttpResponse(f"User ID not found", status=400)
         room = Room.objects.filter(code=room_code).first()
         
-        if room is None:
+        if room is None or room.players.count() != room.maxAmountOfPlayers:
             return HttpResponse(f"Room {room_code} not found", status=400)
         if room.createdBy != user_id:
             return HttpResponse(f"User {user_id} is not the owner of room {room_code}", status=403)
@@ -30,6 +30,7 @@ class GameView(View):
             "players": [
                 {
                     "id": player.id,
+                    "name": player.name,
                     "color": player.profileColor,
                 }
                 for player in room.players.all()
