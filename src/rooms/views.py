@@ -9,6 +9,7 @@ from django.db.models import F, Q
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
+from .utils import validate_field, validate_amount_players, validate_integer_field
 
 from .models import Room, roomTypes, RoomStatus
 from players.models import Player, playerColors
@@ -75,24 +76,28 @@ def setPlayerColor(room_code):
         profileColor = available_colors.pop()
     return profileColor
 
+
 class CreateRoomView(View):
     def post(self, request, *args, **kwargs):
-        data = json.loads(request.body)
-
-        created_by = data.get("createdBy")
-        room_name = data.get("roomName")
-        room_type = data.get("roomType")
-        max_amount_of_players = data.get("maxAmountOfPlayers")
-        private_room = data.get("privateRoom") is True
-
-        if not (created_by and room_name and room_type and max_amount_of_players):
-            return JsonResponse({'errorCode': '400', 'message': 'Bad Request'}, status=400)
+        if not request.body or request.body.strip() == b'':
+            return JsonResponse({'errorCode': '402', 'message': 'Bad Request'}, status=400)
+        try:
+            data = json.loads(request.body)
+        except json.JSONDecodeError:
+            return JsonResponse({'errorCode': '401', 'message': 'Bad Request'}, status=400)
 
         try:
-            room_type = int(room_type)
-            max_amount_of_players = int(max_amount_of_players)
-        except ValueError:
-            return JsonResponse({'errorCode': '400', 'message': 'Bad Request'}, status=400)
+            created_by = validate_field(data, "createdBy", str)
+            room_name = validate_field(data, "roomName", str)
+            room_type = validate_integer_field(data, "roomType", default=0, required=True)
+            private_room = validate_field(data, "privateRoom", bool, default=False, required=False)
+            max_amount_of_players = validate_amount_players(data, "maxAmountOfPlayers", int, room_type)
+
+            if (created_by == "" or room_name == ""):
+                return JsonResponse({'errorCode': '400', 'message': 'createdBy and roomName fields are mandatory.'}, status=400)
+
+        except (ValueError, TypeError) as e:
+            return JsonResponse({'errorCode': '400', 'message': f"{e}."}, status=400)
 
         new_room = Room.objects.create(
             name=room_name,
@@ -124,10 +129,19 @@ class CreateRoomView(View):
 
 class RoomView(View):
     def delete(self, request, room_code):
+        userId = request.headers.get("X-User-Id")
+        if userId is None:
+            return JsonResponse({'errorCode': '401', 'message': 'Unauthorized'}, status=401)
+        
         room = Room.objects.filter(code=room_code).first()
         if room is None:
             return JsonResponse({}, status=204)
+        
         players = Player.objects.filter(roomCode=room_code)
+        user = players.filter(id=userId).first()
+        if room.createdBy != user.id:
+            return JsonResponse({'errorCode': '403', 'message': 'Forbidden'}, status=403)
+        
         channel_layer = get_channel_layer()
         async_to_sync(channel_layer.group_send)(
             f"room_{room_code}",
@@ -148,7 +162,7 @@ class RoomView(View):
             players = Player.objects.filter(roomCode=room.code)
             players_data = [
                 {
-                    'id': player.id,
+                    'id': player.id if user.id == room.createdBy else None,
                     'name': player.name,
                     'profileColor': player.profileColor,
                     'urlProfileImage': player.urlProfileImage,
@@ -165,7 +179,7 @@ class RoomView(View):
                     'amountOfPlayers': len(players_data),
                     'createdBy': room.createdBy,
                     'players': players_data,
-                    'isOwner': userId == room.createdBy,
+                    'isOwner': user.id == room.createdBy,
                 }
             )
         except Room.DoesNotExist:
