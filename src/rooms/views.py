@@ -9,7 +9,7 @@ from django.db.models import F, Q
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
-from .utils import validate_field, validate_amount_players
+from .utils import validate_field, validate_amount_players, validate_integer_field
 
 from .models import Room, roomTypes, RoomStatus
 from players.models import Player, playerColors
@@ -89,8 +89,7 @@ class CreateRoomView(View):
         try:
             created_by = validate_field(data, "createdBy", str)
             room_name = validate_field(data, "roomName", str)
-            room_type = validate_field(data, "roomType", int)
-            max_amount_of_players = validate_field(data, "maxAmountOfPlayers", int)
+            room_type = validate_integer_field(data, "roomType", default=0, required=True)
             private_room = validate_field(data, "privateRoom", bool, default=False, required=False)
             max_amount_of_players = validate_amount_players(data, "maxAmountOfPlayers", int, room_type)
 
@@ -130,10 +129,19 @@ class CreateRoomView(View):
 
 class RoomView(View):
     def delete(self, request, room_code):
+        userId = request.headers.get("X-User-Id")
+        if userId is None:
+            return JsonResponse({'errorCode': '401', 'message': 'Unauthorized'}, status=401)
+        
         room = Room.objects.filter(code=room_code).first()
         if room is None:
             return JsonResponse({}, status=204)
+        
         players = Player.objects.filter(roomCode=room_code)
+        user = players.filter(id=userId).first()
+        if room.createdBy != user.id:
+            return JsonResponse({'errorCode': '403', 'message': 'Forbidden'}, status=403)
+        
         channel_layer = get_channel_layer()
         async_to_sync(channel_layer.group_send)(
             f"room_{room_code}",
@@ -154,7 +162,7 @@ class RoomView(View):
             players = Player.objects.filter(roomCode=room.code)
             players_data = [
                 {
-                    'id': player.id,
+                    'id': player.id if user.id == room.createdBy else None,
                     'name': player.name,
                     'profileColor': player.profileColor,
                     'urlProfileImage': player.urlProfileImage,
@@ -171,7 +179,7 @@ class RoomView(View):
                     'amountOfPlayers': len(players_data),
                     'createdBy': room.createdBy,
                     'players': players_data,
-                    'isOwner': userId == room.createdBy,
+                    'isOwner': user.id == room.createdBy,
                 }
             )
         except Room.DoesNotExist:
