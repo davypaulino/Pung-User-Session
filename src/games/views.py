@@ -16,18 +16,20 @@ class GameView(View):
             return HttpResponse(f"User ID not found", status=400)
         room = Room.objects.filter(code=room_code).first()
         
-        if room is None or room.players.count() != room.maxAmountOfPlayers:
+        if room is None:
             return HttpResponse(f"Room {room_code} not found", status=400)
+        if room.players.count() < 2:
+            return HttpResponse(f"Minimal amount of players {2}", status=403)
         if room.createdBy != user_id:
             return HttpResponse(f"User {user_id} is not the owner of room {room_code}", status=403)
         
         room.status = RoomStatus.CREATING_GAME
         room.save()
-
+        
         isSinglePlayer = False
         if (room.amountOfPlayers == 1):
             isSinglePlayer = True
-
+        
         message = {
             "type": "create_game",
             "roomId": room.id,

@@ -115,6 +115,7 @@ class CreateRoomView(View):
         )
 
         new_room.createdBy = new_player.id
+        new_player.bracketsPosition = 0
         new_room.amountOfPlayers += 1
 
         if (new_room.maxAmountOfPlayers == 1):
@@ -130,7 +131,8 @@ class CreateRoomView(View):
         new_room.save()
 
         return JsonResponse(
-            {'roomCode': new_room.code},
+            {'roomCode': new_room.code,
+             'roomType': new_room.type},
             status=201,
             headers={
                 'Location': f'/session/rooms/{new_room.code}',
@@ -184,6 +186,7 @@ class RoomView(View):
             return JsonResponse(
                 {
                     'roomId': room.id,
+                    'roomType': room.type,
                     'roomCode': room.code,
                     'roomName': room.name,
                     'maxAmountOfPlayers': room.maxAmountOfPlayers,
@@ -216,15 +219,25 @@ def update_players_list(room_code, userRemoved):
 
 class AddPlayerToRoomView(View):
     def put(self, request, room_code):
+
+        if not request.body or request.body.strip() == b'':
+            return JsonResponse({'errorCode': '402', 'message': 'Bad Request'}, status=400)
         try:
             data = json.loads(request.body)
-            player_name = data.get("playerName")
-            if not player_name:
-                return JsonResponse({'errorCode': '400', 'message': 'Player name is required'}, status=400)
+        except json.JSONDecodeError:
+            return JsonResponse({'errorCode': '401', 'message': 'Bad Request'}, status=400)
+        
+        try:
+            player_name = validate_field(data, "playerName", str)
+        except (ValueError, TypeError) as e:
+            return JsonResponse({'errorCode': '400', 'message': f'{e}'}, status=400)
 
-            room = Room.objects.get(code=room_code)
+        try:
+            room = Room.objects.filter(code=room_code).first()
+            if room is None:
+                return JsonResponse({'errorCode': '403', 'message': 'Room dont exist.'}, status=403)
 
-            if Player.objects.filter(roomCode=room_code).count() >= room.maxAmountOfPlayers:
+            if room.players.count() >= room.maxAmountOfPlayers:
                 return JsonResponse({'errorCode': '403', 'message': 'Room is full'}, status=403)
             
             player = Player.objects.create(
@@ -238,8 +251,12 @@ class AddPlayerToRoomView(View):
             room.save()
             update_players_list(room_code, "")
 
-            return HttpResponse(
-                status=204,
+            return JsonResponse(
+                {
+                    'roomCode': room.code,
+                    'roomType': room.type
+                },
+                status=201,
                 headers={
                     'Location': f'/session/rooms/{room_code}',
                     'X-User-Id': player.id
