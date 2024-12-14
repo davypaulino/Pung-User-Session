@@ -18,6 +18,7 @@ class PlayerView(View):
         return JsonResponse(
             {
                 "roomCode": room.code,
+                "roomType": room.type,
                 "roomStatus": room.status,
             },
             status=200,
