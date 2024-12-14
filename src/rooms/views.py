@@ -116,6 +116,17 @@ class CreateRoomView(View):
 
         new_room.createdBy = new_player.id
         new_room.amountOfPlayers += 1
+
+        if (new_room.maxAmountOfPlayers == 1):
+            ia_player = Player.objects.create(
+                name="IA",
+                roomId=new_room,
+                roomCode=new_room.code,
+                profileColor=setPlayerColor(new_room.code),
+                urlProfileImage=f"/assets/img/{random.choice([1, 2])}.png"
+            )
+            new_room.maxAmountOfPlayers += 1
+
         new_room.save()
 
         return JsonResponse(
