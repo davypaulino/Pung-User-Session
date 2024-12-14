@@ -5,6 +5,7 @@ from django.http import HttpResponse
 from django.views import View
 from rooms.models import Room
 from rooms.models import RoomStatus
+from players.models import Player
 
 redis_client = redis.Redis(host='redis', port=6379, db=0, decode_responses=True)
 
@@ -24,10 +25,16 @@ class GameView(View):
         
         room.status = RoomStatus.CREATING_GAME
         room.save()
+        
+        isSinglePlayer = False
+        if (room.amountOfPlayers == 1):
+            isSinglePlayer = True
+        
         message = {
             "type": "create_game",
             "roomId": room.id,
-            'ownerId': user_id,
+            "isSinglePlayer": isSinglePlayer,
+            "ownerId": user_id,
             "players": [
                 {
                     "id": player.id,
