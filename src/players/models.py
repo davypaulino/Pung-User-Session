@@ -3,6 +3,7 @@ import uuid
 from django.db import models
 from enum import Enum
 from rooms.models import Room
+from games.models import GameModel
 
 class playerColors(Enum):
     RED = 0
@@ -14,6 +15,7 @@ class Player(models.Model):
     id = models.CharField(primary_key=True, max_length=64, editable=False)
     name = models.CharField(max_length=100)
     roomId = models.ForeignKey(Room, related_name='players', on_delete=models.CASCADE)
+    GameId = models.ForeignKey(GameModel, related_name='players', on_delete=models.CASCADE, null=True)
     roomCode = models.CharField(max_length=64)
     profileColor = models.IntegerField(choices=[
         (1, "Red"),
@@ -24,6 +26,8 @@ class Player(models.Model):
     urlProfileImage = models.CharField(max_length=100)
     score = models.IntegerField(default=0)
     status = models.BooleanField(default=True)
+    isConnected = models.BooleanField(default=False)
+    bracketsPosition = models.IntegerField(default=0)
     createdBy = models.CharField(max_length=64)
     createdAt = models.DateTimeField(auto_now_add=True)
     updatedBy = models.CharField(max_length=64)
