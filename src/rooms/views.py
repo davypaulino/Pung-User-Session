@@ -120,7 +120,7 @@ class CreateRoomView(View):
 
         if (new_room.maxAmountOfPlayers == 1):
             ia_player = Player.objects.create(
-                name="IA",
+                name="Bot",
                 roomId=new_room,
                 roomCode=new_room.code,
                 profileColor=setPlayerColor(new_room.code),
@@ -271,6 +271,9 @@ class RemovePlayerView(View):
             room = Room.objects.get(code=room_code)
         except Room.DoesNotExist:
             return JsonResponse({'errorCode': '404', 'message': 'Room not found'}, status=404)
+
+        if room.type is roomTypes.SINGLE_PLAYER:
+            return JsonResponse({'errorCode': '400', 'message': 'Bad request'}, status=400)
 
         try:
             player = Player.objects.get(id=player_id, roomCode=room_code)
