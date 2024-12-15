@@ -2,9 +2,11 @@ from .models import roomTypes
 
 def get_room_type_range(room_type):
     if room_type == roomTypes.MATCH:
-        return [1, 2, 4]
+        return [2, 4]
     if room_type == roomTypes.TOURNAMENT:
         return [4, 8, 16]
+    if room_type == roomTypes.SINGLE_PLAYER:
+        return [1]
     raise ValueError(f"Invalid room type: {room_type}")
 
 def validate_field(data, field, field_type, default=None, required=True):

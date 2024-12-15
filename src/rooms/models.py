@@ -13,6 +13,7 @@ def generate_unique_code(model):
 class roomTypes(Enum):
     MATCH = 0
     TOURNAMENT = 1
+    SINGLE_PLAYER = 2
 
 class RoomStatus(Enum):
     CREATING_ROOM = 0
