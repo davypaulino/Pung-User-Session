@@ -4,12 +4,6 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.db import models
 from enum import Enum
 
-def generate_unique_code(model):
-    while True:
-        code = str(uuid.uuid4().int)[:8]
-        if not model.objects.filter(roomCode=code).exists():
-            return code
-
 class roomTypes(Enum):
     MATCH = 0
     TOURNAMENT = 1
@@ -67,33 +61,30 @@ class Room(models.Model):
     def __str__(self):
         return self.name
 
-# class Match(models.Model):
-#     matchId = models.CharField(primary_key=True, max_length=64, editable=False)
-#     roomCode = models.CharField(max_length=64)
-#     maxAmountOfPlayers = models.IntegerField(default=1)
-#     amountOfPlayers = models.IntegerField(default=1)
-#     matchStatus = models.IntegerField(default=0)
-#     matchWinner = models.CharField(max_length=100)
-#     createdBy = models.CharField(max_length=64)
-#     createdAt = models.DateTimeField(auto_now_add=True)
-#     updatedBy = models.CharField(max_length=64)
-#     updatedAt = models.DateTimeField(auto_now=True)
+class Match(models.Model):
+    STATUS_CHOICES = [
+        (0, 'created'),
+        (1, 'in progress'),
+        (2, 'finished'),
+    ]
+    id = models.CharField(primary_key=True, max_length=64, editable=False)
+    gameId = models.CharField(max_length=64, editable=False, null=True)
+    room = models.ForeignKey(Room, related_name='matchs', on_delete=models.CASCADE)
+    stage = models.IntegerField(default=1)
+    winner = models.CharField(max_length=64, editable=False, null=True)
+    status = models.CharField(max_length=14, choices=STATUS_CHOICES, default='created')
+    createdBy = models.CharField(max_length=64)
+    createdAt = models.DateTimeField(auto_now_add=True)
+    updatedBy = models.CharField(max_length=64)
+    updatedAt = models.DateTimeField(auto_now=True)    
 
-#     def save(self, *args, **kwargs):
-#         if not self.matchId:
-#             self.matchId = str(uuid.uuid4().int)
-#         super().save(*args, **kwargs)
+    def save(self, *args, **kwargs):
+        if not self.id:
+            self.id = str(uuid.uuid4())
+        super().save(*args, **kwargs)
 
-#     def __str__(self):
-#         return self.matchId
-
-# class TotalScores(models.Model):
-#     playerId = models.CharField(primary_key=True, max_length=64, editable=False)
-#     score = models.IntegerField(default=0)
-#     createdBy = models.CharField(max_length=64)
-#     createdAt = models.DateTimeField(auto_now_add=True)
-#     updatedBy = models.CharField(max_length=64)
-#     updatedAt = models.DateTimeField(auto_now=True)
+    def __str__(self):
+        return self.id
 
 # class Tournament(models.Model):
 #     tournamentCode = models.CharField(primary_key=True, max_length=64, editable=False)

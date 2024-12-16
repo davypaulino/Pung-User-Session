@@ -1,8 +1,9 @@
 import uuid
 
 from django.db import models
+from django.core.validators import MinValueValidator, MaxValueValidator
 from enum import Enum
-from rooms.models import Room
+from rooms.models import Room, Match
 from games.models import GameModel
 
 class playerColors(Enum):
@@ -40,3 +41,8 @@ class Player(models.Model):
 
     def __str__(self):
         return self.name
+
+class MatchPlayer(models.Model):
+    match = models.ForeignKey(Match, on_delete=models.CASCADE, related_name='players_in_match')
+    player = models.ForeignKey(Player, on_delete=models.CASCADE, related_name='matches_played')
+    position = models.IntegerField(default=0, validators=[MinValueValidator(0), MaxValueValidator(4)])
