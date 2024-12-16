@@ -119,7 +119,7 @@ class CreateRoomView(View):
         new_room.amountOfPlayers += 1
 
         if (new_room.maxAmountOfPlayers == 1):
-            ia_player = Player.objects.create(
+            Player.objects.create(
                 name="Bot",
                 roomId=new_room,
                 roomCode=new_room.code,
