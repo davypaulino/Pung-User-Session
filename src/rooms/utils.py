@@ -17,6 +17,16 @@ def validate_field(data, field, field_type, default=None, required=True):
         raise ValueError(f"'{field}' type value is {field_type.__name__}.")
     return value
 
+def validate_name_field(data, field, required=True):
+    value = data.get(field, "Senhor Bolinha")
+    if required and value is None:
+        raise ValueError(f"'{field}' field is mandatory.")
+    if not isinstance(value, str):
+        raise ValueError(f"'{field}' type value is {str.__name__}.")
+    if len(value) < 3 or len(value) > 100:
+        raise ValueError(f"'{field}' value must have between 3 and 100 characters.")
+    return value
+
 def validate_integer_field(data, field, default=None, required=True):
     value = data.get(field, default)
     if required and value is None:

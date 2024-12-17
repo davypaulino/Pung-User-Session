@@ -4,7 +4,6 @@ from django.db import models
 from django.core.validators import MinValueValidator, MaxValueValidator
 from enum import Enum
 from rooms.models import Room, Match
-from games.models import GameModel
 
 class playerColors(Enum):
     RED = 0
@@ -16,7 +15,6 @@ class Player(models.Model):
     id = models.CharField(primary_key=True, max_length=64, editable=False)
     name = models.CharField(max_length=100)
     roomId = models.ForeignKey(Room, related_name='players', on_delete=models.CASCADE)
-    GameId = models.ForeignKey(GameModel, related_name='players', on_delete=models.CASCADE, null=True)
     roomCode = models.CharField(max_length=64)
     profileColor = models.IntegerField(choices=[
         (1, "Red"),
