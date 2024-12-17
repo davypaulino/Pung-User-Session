@@ -22,7 +22,7 @@ class GameView(View):
             return HttpResponse(f"Minimal amount of players {2}", status=403)
         if room.createdBy != user_id:
             return HttpResponse(f"User {user_id} is not the owner of room {room_code}", status=403)
-        if room.type != 0:
+        if room.type == 1:
             return HttpResponse(f"Room {room_code} is not a match game room", status=403)
 
         room.status = RoomStatus.CREATING_GAME

@@ -23,6 +23,7 @@ class Room(models.Model):
     TYPE_CHOICES = [
         (0, "Match"),
         (1, "Tournament"),
+        (2, "Single player")
     ]
 
     STATUS_CHOICES = [

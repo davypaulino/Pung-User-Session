@@ -9,7 +9,7 @@ from django.db.models import F, Q
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
-from .utils import validate_field, validate_amount_players, validate_integer_field, validate_name_field
+from .utils import validate_field, validate_amount_players, validate_integer_field, validate_name_field, setPlayerColor, setBracketsPosition
 
 from .models import Room, roomTypes, RoomStatus
 from players.models import Player, playerColors
@@ -66,17 +66,6 @@ class RoomGetView(View):
 
         return JsonResponse(response)
 
-def setPlayerColor(room_code):
-    room = Room.objects.filter(code=room_code).first()
-    profileColor = 0
-    used_colors = Player.objects.filter(roomCode=room_code).values_list('profileColor', flat=True)
-    all_colors = {color.value for color in playerColors}
-    available_colors = all_colors - set(used_colors)
-    if available_colors:
-        profileColor = available_colors.pop()
-    return profileColor
-
-
 class CreateRoomView(View):
     def post(self, request, *args, **kwargs):
         if not request.body or request.body.strip() == b'':
@@ -114,11 +103,15 @@ class CreateRoomView(View):
             urlProfileImage=f"/assets/img/{random.choice([1, 2])}.png"
         )
 
+        if new_room.type == roomTypes.TOURNAMENT.value:
+            new_player.bracketsPosition = setBracketsPosition(new_room.code)
+            new_player.profileColor = new_player.bracketsPosition % 2
+            new_player.save()
+
         new_room.createdBy = new_player.id
-        new_player.bracketsPosition = 0
         new_room.amountOfPlayers += 1
 
-        if (new_room.maxAmountOfPlayers == 1):
+        if new_room.type == roomTypes.SINGLE_PLAYER.value:
             Player.objects.create(
                 name="Bot",
                 roomId=new_room,
@@ -199,6 +192,45 @@ class RoomView(View):
         except Room.DoesNotExist:
             return JsonResponse({'errorCode': '404', 'message': 'Room not found'}, status=404)
 
+class TournamentView(View):
+    def get(self, request, room_code):
+        try:
+            room = Room.objects.get(code=room_code)
+            userId = request.headers.get("X-User-Id")
+            user = Player.objects.filter(roomCode=room.code, id=userId).first()
+            if user is None:
+                return JsonResponse({'errorCode': '403', 'message': 'Forbidden'}, status=403)
+            
+            players_data = {}
+            for i in range(1, room.maxAmountOfPlayers + 1):
+                player = Player.objects.filter(roomCode=room.code, bracketsPosition=i).first()
+                if player:
+                    players_data[i] = {
+                        "name": player.name,
+                        "urlProfileImage": player.urlProfileImage,
+                        "color": player.profileColor
+                    }
+                else:
+                    players_data[i] = None
+
+            return JsonResponse(
+                {
+                    'round': 1,
+                    'roomId': room.id,
+                    'roomType': room.type,
+                    'roomCode': room.code,
+                    'roomName': room.name,
+                    'maxNumberOfPlayers': room.maxAmountOfPlayers,
+                    'numberOfPlayers': room.amountOfPlayers,
+                    'createdBy': room.createdBy,
+                    'players': players_data,
+                    'owner': user.id == room.createdBy,
+                    'tournamentOwner': user.id == room.createdBy,
+                }
+            )
+        except Room.DoesNotExist:
+            return JsonResponse({'errorCode': '404', 'message': 'Room not found'}, status=404)
+
 class RoomStatusView(View):
     def get(self, request, room_code):
         try:
@@ -247,6 +279,12 @@ class AddPlayerToRoomView(View):
                 profileColor=setPlayerColor(room.code),
                 urlProfileImage=f"/assets/img/{random.choice([1, 2])}.png"
             )
+
+            if room.type == roomTypes.TOURNAMENT.value:
+                player.bracketsPosition = setBracketsPosition(room.code)
+                player.profileColor = player.bracketsPosition % 2
+                player.save()
+
             room.amountOfPlayers += 1
             room.save()
             update_players_list(room_code, "")
