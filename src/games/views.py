@@ -3,9 +3,9 @@ import json
 
 from django.http import HttpResponse
 from django.views import View
-from rooms.models import Room
+from rooms.models import Room, Match
 from rooms.models import RoomStatus
-from players.models import Player
+from players.models import Player, MatchPlayer
 
 redis_client = redis.Redis(host='redis', port=6379, db=0, decode_responses=True)
 
@@ -22,17 +22,32 @@ class GameView(View):
             return HttpResponse(f"Minimal amount of players {2}", status=403)
         if room.createdBy != user_id:
             return HttpResponse(f"User {user_id} is not the owner of room {room_code}", status=403)
-        
+        if room.type != 0:
+            return HttpResponse(f"Room {room_code} is not a match game room", status=403)
+
         room.status = RoomStatus.CREATING_GAME
         room.save()
         
         isSinglePlayer = False
         if (room.amountOfPlayers == 1):
             isSinglePlayer = True
+
+        match = Match.objects.create(
+            room=room,
+            status=0
+        )
+        match.save()
+        for player in room.players.all():
+            MatchPlayer.objects.create(
+                match=match,
+                player=player,
+                position=0
+            )
         
         message = {
             "type": "create_game",
             "roomId": room.id,
+            "matchId": match.id,
             "isSinglePlayer": isSinglePlayer,
             "ownerId": user_id,
             "players": [

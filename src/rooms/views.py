@@ -9,7 +9,7 @@ from django.db.models import F, Q
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
-from .utils import validate_field, validate_amount_players, validate_integer_field
+from .utils import validate_field, validate_amount_players, validate_integer_field, validate_name_field
 
 from .models import Room, roomTypes, RoomStatus
 from players.models import Player, playerColors
@@ -88,7 +88,7 @@ class CreateRoomView(View):
 
         try:
             created_by = validate_field(data, "createdBy", str)
-            room_name = validate_field(data, "roomName", str)
+            room_name = validate_name_field(data, "roomName")
             room_type = validate_integer_field(data, "roomType", default=0, required=True)
             private_room = validate_field(data, "privateRoom", bool, default=False, required=False)
             max_amount_of_players = validate_amount_players(data, "maxAmountOfPlayers", int, room_type)
@@ -228,7 +228,7 @@ class AddPlayerToRoomView(View):
             return JsonResponse({'errorCode': '401', 'message': 'Bad Request'}, status=400)
         
         try:
-            player_name = validate_field(data, "playerName", str)
+            player_name = validate_name_field(data, "playerName")
         except (ValueError, TypeError) as e:
             return JsonResponse({'errorCode': '400', 'message': f'{e}'}, status=400)
 

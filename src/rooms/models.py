@@ -34,6 +34,10 @@ class Room(models.Model):
         (5, "Game Created"),
         (6, "Game Started"),
         (7, "Game Ended"),
+        (10, "Tournament Created"),
+        (11, "Tournament Started"),
+        (12, "Tournament In Progress"),
+        (13, "Tournament Ended"),
     ]
 
     id = models.CharField(primary_key=True, max_length=64, editable=False)

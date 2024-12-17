@@ -39,6 +39,7 @@ INSTALLED_APPS = [
     "corsheaders",
     "channels",
     'games',
+    'worker'
 ]
 
 MIDDLEWARE = [
@@ -101,6 +102,41 @@ DATABASES = {
         'HOST': os.environ.get('DB_HOST', '0.0.0.0'),  # Endereço do servidor de banco de dados
         'PORT': os.environ.get('DB_PORT', '5432'),     # Porta padrão do PostgreSQL
     }
+}
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '{levelname} {asctime} {name} {message}',
+            'style': '{',
+        },
+        'simple': {
+            'format': '{levelname} {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'console': {
+            'level': 'DEBUG',  # Captura todos os níveis
+            'class': 'logging.StreamHandler',
+            'stream': 'ext://sys.stdout',  # Garante que a saída seja o terminal padrão
+            'formatter': 'verbose',  # Formato detalhado
+        },
+    },
+    'loggers': {
+        'django': {
+            'handlers': ['console'],
+            'level': 'DEBUG',  # Captura todos os níveis do Django
+            'propagate': True,
+        },
+        '': {  # Logger raiz captura todos os logs, incluindo bibliotecas externas
+            'handlers': ['console'],
+            'level': 'DEBUG',  # Captura todos os níveis
+            'propagate': False,
+        },
+    },
 }
 
 # Password validation
