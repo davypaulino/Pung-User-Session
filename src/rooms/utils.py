@@ -1,4 +1,7 @@
-from .models import roomTypes
+import random
+
+from .models import roomTypes, Room
+from players.models import Player, playerColors
 
 def get_room_type_range(room_type):
     if room_type == roomTypes.MATCH:
@@ -56,3 +59,21 @@ def validate_amount_players(data, field, field_type, room_type):
     if value not in range:
         raise ValueError(f"'{field}' is not a valid size of players.")
     return value
+
+def setPlayerColor(room_code):
+    room = Room.objects.filter(code=room_code).first()
+    profileColor = 0
+    used_colors = Player.objects.filter(roomCode=room_code).values_list('profileColor', flat=True)
+    all_colors = {color.value for color in playerColors}
+    available_colors = all_colors - set(used_colors)
+    if available_colors:
+        profileColor = available_colors.pop()
+    return profileColor
+
+def setBracketsPosition(room_code):
+    room = Room.objects.filter(code=room_code).first()
+    used_positions = room.players.values_list('bracketsPosition', flat=True)
+    used_positions_list = list(used_positions)
+
+    avaliable_positions_list = list(filter(lambda x: x not in used_positions_list, list(range(1,room.maxAmountOfPlayers + 1))))
+    return random.choice(avaliable_positions_list)
