@@ -44,3 +44,6 @@ class MatchPlayer(models.Model):
     match = models.ForeignKey(Match, on_delete=models.CASCADE, related_name='players_in_match')
     player = models.ForeignKey(Player, on_delete=models.CASCADE, related_name='matches_played')
     position = models.IntegerField(default=0, validators=[MinValueValidator(0), MaxValueValidator(4)])
+
+    class Meta:
+        unique_together = ('match', 'player')

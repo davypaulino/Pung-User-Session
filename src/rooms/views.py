@@ -9,10 +9,10 @@ from django.db.models import F, Q
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
-from .utils import validate_field, validate_amount_players, validate_integer_field, validate_name_field, setPlayerColor, setBracketsPosition
+from .utils import validate_field, validate_amount_players, validate_integer_field, validate_name_field, setPlayerColor, setBracketsPosition, createTournamentMatches
 
-from .models import Room, roomTypes, RoomStatus
-from players.models import Player, playerColors
+from .models import Room, roomTypes, RoomStatus, Match
+from players.models import Player, playerColors, MatchPlayer
 
 class RoomGetView(View):
     def get(self, request):
@@ -213,6 +213,11 @@ class TournamentView(View):
                 else:
                     players_data[i] = None
 
+            matchPlayer = MatchPlayer.objects.filter(player=user).first()
+            owner = False
+            if user.bracketsPosition % 2 != 0:
+                owner = True
+
             return JsonResponse(
                 {
                     'round': 1,
@@ -224,7 +229,7 @@ class TournamentView(View):
                     'numberOfPlayers': room.amountOfPlayers,
                     'createdBy': room.createdBy,
                     'players': players_data,
-                    'owner': user.id == room.createdBy,
+                    'owner': owner,
                     'tournamentOwner': user.id == room.createdBy,
                 }
             )
@@ -288,6 +293,9 @@ class AddPlayerToRoomView(View):
             room.amountOfPlayers += 1
             room.save()
             update_players_list(room_code, "")
+
+            if room.type == roomTypes.TOURNAMENT.value and room.amountOfPlayers == room.maxAmountOfPlayers:
+                createTournamentMatches(room)
 
             return JsonResponse(
                 {
