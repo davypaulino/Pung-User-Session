@@ -69,8 +69,9 @@ class Room(models.Model):
 class Match(models.Model):
     STATUS_CHOICES = [
         (0, 'created'),
-        (1, 'in progress'),
-        (2, 'finished'),
+        (1, 'filled'),
+        (2, 'in progress'),
+        (3, 'finished'),
     ]
     id = models.CharField(primary_key=True, max_length=64, editable=False)
     gameId = models.CharField(max_length=64, editable=False, null=True)
@@ -78,6 +79,8 @@ class Match(models.Model):
     stage = models.IntegerField(default=1)
     winner = models.CharField(max_length=64, editable=False, null=True)
     status = models.CharField(max_length=14, choices=STATUS_CHOICES, default='created')
+    position = models.IntegerField(default=0)
+    nextMatch = models.CharField(max_length=64, editable=False, null=True)
     createdBy = models.CharField(max_length=64)
     createdAt = models.DateTimeField(auto_now_add=True)
     updatedBy = models.CharField(max_length=64)
@@ -90,19 +93,3 @@ class Match(models.Model):
 
     def __str__(self):
         return self.id
-
-# class Tournament(models.Model):
-#     tournamentCode = models.CharField(primary_key=True, max_length=64, editable=False)
-#     numberOfGames = models.IntegerField(default=0)
-#     amountOfPlayers = models.IntegerField(default=0)
-#     tournamentWinner = models.CharField(max_length=100)
-#     createdBy = models.CharField(max_length=64)
-#     createdAt = models.DateTimeField(auto_now_add=True)
-#     updatedBy = models.CharField(max_length=64)
-#     updatedAt = models.DateTimeField(auto_now=True)
-
-# class TournamentRank(models.Model):
-#     playerId = models.CharField(primary_key=True, max_length=64, editable=False)
-#     tournamentCode = models.CharField(max_length=64, editable=False)
-#     rankPosition = models.IntegerField(default=0)
-#     numberOfGamesPlayed = models.IntegerField(default=0)
