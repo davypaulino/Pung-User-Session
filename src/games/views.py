@@ -1,8 +1,12 @@
 import redis
 import json
+import logging
 
 from django.http import HttpResponse
 from django.views import View
+from channels.layers import get_channel_layer
+from asgiref.sync import async_to_sync
+
 from rooms.models import Room, Match
 from rooms.models import RoomStatus, roomTypes
 from players.models import Player, MatchPlayer
@@ -43,6 +47,23 @@ class GameView(View):
                 player=player,
                 position=0
             )
+
+        channel_layer = get_channel_layer()
+        async_to_sync(channel_layer.group_send)(
+            f"room_{room_code}",
+            {
+                "type": "sync.match",
+                "matches": [
+                    {
+                        "id": match.id,
+                        "players": [
+                            {"id": player.id}
+                            for player in room.players.all()
+                        ]
+                    }
+                ]
+            }
+        )
         
         message = {
             "type": "create_game",
@@ -77,32 +98,38 @@ class TournamentGameView(View):
         if room.type != roomTypes.TOURNAMENT.value:
             return HttpResponse(f"Room {room_code} is not a tournament game room", status=403)
 
-        player_one = Player.objects.filter(id=user_id).first()
+        room.status = RoomStatus.CREATING_GAME
+        room.save()
 
-        matchPlayer = MatchPlayer.objects.filter(player=player_one).first()
-        match = matchPlayer.match
-        secondMatchPlayer = MatchPlayer.objects.filter(match=match).exclude(player=player_one).first()
-        player_two = secondMatchPlayer.player
+        try:
+            player_one = Player.objects.filter(id=user_id).first()
 
-        message = {
-            "type": "create_game",
-            "roomId": room.id,
-            "matchId": match.id,
-            "isSinglePlayer": False,
-            "ownerId": user_id,
-            "players": [
-                {
-                    "id": player_one.id,
-                    "name": player_one.name,
-                    "color": player_one.profileColor,
-                },
-                {
-                    "id": player_two.id,
-                    "name": player_two.name,
-                    "color": player_two.profileColor,
-                }
-            ]
-        }
+            matchPlayer = MatchPlayer.objects.filter(player=player_one).first()
+            match = matchPlayer.match
+            secondMatchPlayer = MatchPlayer.objects.filter(match=match).exclude(player=player_one).first()
+            player_two = secondMatchPlayer.player
+
+            message = {
+                "type": "create_game",
+                "roomId": room.id,
+                "matchId": match.id,
+                "isSinglePlayer": False,
+                "ownerId": user_id,
+                "players": [
+                    {
+                        "id": player_one.id,
+                        "name": player_one.name,
+                        "color": player_one.profileColor,
+                    },
+                    {
+                        "id": player_two.id,
+                        "name": player_two.name,
+                        "color": player_two.profileColor,
+                    }
+                ]
+            }
+        except Exception as e:
+            logger.Error(f"eeeee {e}")
 
         redis_client.rpush("create-game-queue", json.dumps(message))
         return HttpResponse(f"Game created for room {room_code}", status=201)
