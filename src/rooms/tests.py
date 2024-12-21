@@ -1,3 +1,109 @@
+from django.test import TestCase
+from .models import Room, Match
+from players.models import Player, MatchPlayer
+from .utils import createTournamentMatches
+import math
+
+class TournamentMatchesTestCase(TestCase):
+    def setUp(self):
+        # Mock the database by creating test data
+        self.room = Room.objects.create(
+            name='Tournament Room',
+            maxAmountOfPlayers=8,
+            type=1,  # Tournament
+            amountOfPlayers=8
+        )
+        # Add 8 players to the mock database
+        self.players = []
+        for i in range(1, 9):
+            player = Player.objects.create(
+                name=f'Player {i}',
+                roomId=self.room,
+                roomCode=self.room.code,
+                bracketsPosition=i
+            )
+            self.players.append(player)
+
+    def test_create_tournament_matches(self):
+        # Call the function to create tournament matches
+        createTournamentMatches(self.room)
+
+        # Calculate expected number of matches
+        number_of_rounds = math.ceil(math.log2(self.room.maxAmountOfPlayers))
+        total_matches = sum(2 ** (number_of_rounds - round_number) for round_number in range(1, number_of_rounds + 1))
+
+        # Check if the correct number of matches were created
+        matches = Match.objects.filter(room=self.room)
+        self.assertEqual(matches.count(), total_matches)
+
+        # Validate first round matches have correct players assigned
+        first_round_matches = matches.filter(stage=1).order_by('position')
+        self.assertEqual(first_round_matches.count(), 4)  # Should be 4 matches in the first round
+
+        expected_pairs = list(zip(self.players[::2], self.players[1::2]))
+        for match, (player_one, player_two) in zip(first_round_matches, expected_pairs):
+            match_players = MatchPlayer.objects.filter(match=match)
+            self.assertEqual(match_players.count(), 2)
+            self.assertIn(player_one, [mp.player for mp in match_players])
+            self.assertIn(player_two, [mp.player for mp in match_players])
+
+    def test_matches_linked_correctly(self):
+        createTournamentMatches(self.room)
+        matches = Match.objects.filter(room=self.room)
+        number_of_rounds = math.ceil(math.log2(self.room.maxAmountOfPlayers))
+
+        # For each match except the final, check that nextMatch is set correctly
+        for stage in range(1, number_of_rounds):
+            current_round_matches = matches.filter(stage=stage).order_by('position')
+            next_round_matches = matches.filter(stage=stage + 1).order_by('position')
+            for i in range(0, len(current_round_matches), 2):
+                match_one = current_round_matches[i]
+                match_two = current_round_matches[i + 1]
+                expected_next_match = next_round_matches[i // 2]
+                self.assertEqual(match_one.nextMatch, expected_next_match.id)
+                self.assertEqual(match_two.nextMatch, expected_next_match.id)
+
+        # Final match should not have a nextMatch
+        final_match = matches.get(stage=number_of_rounds)
+        self.assertIsNone(final_match.nextMatch)
+
+    def test_tournament_progression(self):
+        createTournamentMatches(self.room)
+        matches = Match.objects.filter(room=self.room)
+        number_of_rounds = math.ceil(math.log2(self.room.maxAmountOfPlayers))
+
+        # Simulate tournament progression by assigning winners
+        for stage in range(1, number_of_rounds + 1):
+            stage_matches = matches.filter(stage=stage).order_by('position')
+            for match in stage_matches:
+                match_players = MatchPlayer.objects.filter(match=match)
+                if not match_players.exists():
+                    match.status = 3  # Finished without players
+                    match.save()
+                    continue  # Skip matches without players
+                # Assign the first player as the winner
+                winner_player = match_players.first().player
+                match.winner = winner_player.id
+                match.status = 3  # Finished
+                match.save()
+            if match.nextMatch:
+                next_match = Match.objects.get(id=match.nextMatch)
+                MatchPlayer.objects.create(match=next_match, player=winner_player)
+
+        # Check that the final match has a winner
+        final_match = matches.get(stage=number_of_rounds)
+        self.assertIsNotNone(final_match.winner)
+
+        # Check that the tournament winner is one of the original players
+        tournament_winner = Player.objects.get(id=final_match.winner)
+        self.assertIn(tournament_winner, self.players)
+
+
+
+
+
+
+# tests antigos
 from django.test import TestCase, Client
 from django.urls import reverse
 from django.http import JsonResponse
@@ -42,10 +148,10 @@ class RoomStatusViewTest(TestCase):
 #             "privateRoom": "true"
 #         }
 #         response = self.client.post(self.url, json.dumps(data), content_type="application/json")
-        
+
 #         # Verifica se o status HTTP é 201 (Created)
 #         self.assertEqual(response.status_code, 201)
-        
+
 #         # Verifica o conteúdo da resposta
 #         response_data = response.json()
 #         self.assertIn('roomCode', response_data)
@@ -59,10 +165,10 @@ class RoomStatusViewTest(TestCase):
 #             # Faltando roomType e numberOfPlayers
 #         }
 #         response = self.client.post(self.url, json.dumps(data), content_type="application/json")
-        
+
 #         # Verifica se o status HTTP é 400 (Bad Request)
 #         self.assertEqual(response.status_code, 400)
-        
+
 #         # Verifica o conteúdo da resposta
 #         response_data = response.json()
 #         self.assertEqual(response_data, {'errorCode': '400', 'message': 'Bad Request'})
@@ -76,10 +182,10 @@ class RoomStatusViewTest(TestCase):
 #             "privateRoom": "true"
 #         }
 #         response = self.client.post(self.url, json.dumps(data), content_type="application/json")
-        
+
 #         # Verifica se o status HTTP é 400 (Bad Request)
 #         self.assertEqual(response.status_code, 400)
-        
+
 #         # Verifica o conteúdo da resposta
 #         response_data = response.json()
 #         self.assertEqual(response_data, {'errorCode': '400', 'message': 'Bad Request'})
@@ -93,10 +199,10 @@ class RoomStatusViewTest(TestCase):
 #             "privateRoom": "true"
 #         }
 #         response = self.client.post(self.url, json.dumps(data), content_type="application/json")
-        
+
 #         # Verifica se o status HTTP é 400 (Bad Request)
 #         self.assertEqual(response.status_code, 400)
-        
+
 #         # Verifica o conteúdo da resposta
 #         response_data = response.json()
 #         self.assertEqual(response_data, {'errorCode': '400', 'message': 'Bad Request'})
@@ -146,7 +252,7 @@ class RoomStatusViewTest(TestCase):
 
 #         # Verifique se os dados retornados estão corretos
 #         response_data = response.json()
-        
+
 #         # Verifique os dados da sala
 #         self.assertEqual(response_data["matchId"], self.match.matchId)
 #         self.assertEqual(response_data["maxAmountOfPlayers"], self.match.maxAmountOfPlayers)
@@ -294,7 +400,7 @@ class RoomStatusViewTest(TestCase):
 #         self.assertTrue(data["hasNextPage"])
 
 # class RemovePlayerViewTest(TestCase):
-    
+
 #     def setUp(self):
 #         self.room = Room.objects.create(
 #             roomName="Test Room",
@@ -315,7 +421,7 @@ class RoomStatusViewTest(TestCase):
 #         response = self.client.delete(
 #             reverse('remove-player', args=[self.room.roomCode, self.player.playerId])
 #         )
-        
+
 #         self.assertEqual(response.status_code, 204)
 #         self.assertEqual(Player.objects.filter(playerId=self.player.playerId).count(), 0)
 
@@ -324,7 +430,7 @@ class RoomStatusViewTest(TestCase):
 #         response = self.client.delete(
 #             reverse('remove-player', args=[self.room.roomCode, "non_existent_player"])
 #         )
-        
+
 #         self.assertEqual(response.status_code, 404)
 #         response_data = response.json()
 #         self.assertEqual(response_data, {"errorCode": "404", "message": "Player not found in the room"})
@@ -334,7 +440,7 @@ class RoomStatusViewTest(TestCase):
 #         response = self.client.delete(
 #             reverse('remove-player', args=["non_existent_room", self.player.playerId])
 #         )
-        
+
 #         self.assertEqual(response.status_code, 404)
 #         self.assertEqual(response.json(), {"errorCode": "404", "message": "Room not found"})
 

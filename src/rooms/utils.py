@@ -1,4 +1,5 @@
 import random
+import math
 
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
@@ -81,68 +82,43 @@ def setBracketsPosition(room_code):
     avaliable_positions_list = list(filter(lambda x: x not in used_positions_list, list(range(1,room.maxAmountOfPlayers + 1))))
     return random.choice(avaliable_positions_list)
 
-def createPreviousMatchesTournament(room, stage, nextMatch, position):
-        if stage < 1:
-            return
-        numberOfRounds = (room.maxAmountOfPlayers // 2)
-        for i in range(1, 3):
-            match = Match.objects.create(
-                room=room,
-                stage=stage,
-                status=0,
-                position=position - i,
-                nextMatch=nextMatch,
-            )
-            if numberOfRounds == 3 or (numberOfRounds == 4 and stage == 3):
-                if i == 1:
-                    position -= 2
-                else:
-                    position -= 4
-            elif numberOfRounds == 4 and stage == 2:
-                if position == 13:
-                    if i == 1:
-                        position = 9
-                    else:
-                        position = 7
-                elif position == 11:
-                    if i == 1:
-                        position = 5
-                    else:
-                        position = 3
 
-            createPreviousMatchesTournament(room, stage - 1, match.id, position)
-
-def setFirstRound(room):
-    playerNumber = 1
-    for matchPosition in range(1, 3):
-        match = Match.objects.filter(room=room, stage=1, position=matchPosition).first()
-        player_one = Player.objects.filter(roomId=room, bracketsPosition=playerNumber).first()
-        player_two = Player.objects.filter(roomId=room, bracketsPosition=playerNumber + 1).first()
-        MatchPlayer.objects.create(match=match, player=player_one)
+def setFirstRound(room, first_round_matches):
+    players = Player.objects.filter(roomId=room).order_by('bracketsPosition')
+    for match, player_pair in zip(first_round_matches, zip(players[::2], players[1::2])):
+        player_one, player_two = player_pair
+        # Correctly assign 'match' and 'player' foreign keys
+        MatchPlayer.objects.create(match=match, player=player_one, position=1)
         MatchPlayer.objects.create(match=match, player=player_two)
-        playerNumber += 2
-
-# def setNextRound(room, nextRound):
-#     firstMatchPosition = maxAmountOfPlayers
-#     for i in range(1, nextRound):
-#         firstMatchPosition -= maxAmountOfPlayers // (2 ** i)
-#     for matchPosition in range(firstMatchPosition, room.maxAmountOfPlayers / 2 ** (nextRound - 1)):
-#         match = Match.objects.filter(room=room, stage=nextRound - 1, position=matchPosition).first()
-#         winner = Player.objects.filter(id=match.winner, roomId=room).first()
-#         nextMatch = Match.objects.filter(room=room, stage=nextRound, id=match.nextMatch).first()
-#         MatchPlayer.objects.create(match=nextMatch, player=winner)
 
 def createTournamentMatches(room):
-    numberOfRounds = (room.maxAmountOfPlayers // 2)
-    position = room.maxAmountOfPlayers - 1
-    finalMatch = Match.objects.create(
-        room=room,
-        stage=numberOfRounds,
-        status=0,
-        position=position,
-        nextMatch=None,
-    )
+    number_of_rounds = math.ceil(math.log2(room.maxAmountOfPlayers))
+    matches = {}
 
-    createPreviousMatchesTournament(room, numberOfRounds - 1, finalMatch.id, position)
+    # Create all matches for each round
+    for round_number in range(1, number_of_rounds + 1):
+        matches_in_round = []
+        num_matches = 2 ** (number_of_rounds - round_number)
+        for match_position in range(1, num_matches + 1):
+            match = Match.objects.create(
+                room=room,
+                stage=round_number,
+                status=0,
+                position=match_position
+            )
+            matches_in_round.append(match)
+        matches[round_number] = matches_in_round
 
-    setFirstRound(room)
+    # Link matches to next matches
+    for round_number in range(1, number_of_rounds):
+        current_round = matches[round_number]
+        next_round = matches[round_number + 1]
+        for i in range(0, len(current_round), 2):
+            next_match = next_round[i // 2]
+            current_round[i].nextMatch = next_match.id
+            current_round[i].save()
+            current_round[i + 1].nextMatch = next_match.id
+            current_round[i + 1].save()
+
+    # Assign players to first round matches
+    setFirstRound(room, matches[1])
