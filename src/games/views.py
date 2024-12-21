@@ -11,6 +11,8 @@ from rooms.models import Room, Match
 from rooms.models import RoomStatus, roomTypes
 from players.models import Player, MatchPlayer
 
+logger = logging.getLogger(__name__)
+
 redis_client = redis.Redis(host='redis', port=6379, db=0, decode_responses=True)
 
 class GameView(View):
@@ -112,6 +114,7 @@ class TournamentGameView(View):
             message = {
                 "type": "create_game",
                 "roomId": room.id,
+                "roomType": room.type,
                 "matchId": match.id,
                 "isSinglePlayer": False,
                 "ownerId": user_id,
@@ -129,7 +132,8 @@ class TournamentGameView(View):
                 ]
             }
         except Exception as e:
-            logger.Error(f"eeeee {e}")
+            logger.error(f"Error creating game for room {room_code}: {str(e)}")
+            return HttpResponse(f"Error creating game for room {room_code}", status=500)
 
         redis_client.rpush("create-game-queue", json.dumps(message))
         return HttpResponse(f"Game created for room {room_code}", status=201)

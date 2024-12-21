@@ -146,23 +146,3 @@ def createTournamentMatches(room):
     createPreviousMatchesTournament(room, numberOfRounds - 1, finalMatch.id, position)
 
     setFirstRound(room)
-
-    matches = Match.objects.filter(room=room)
-
-    channel_layer = get_channel_layer()
-    async_to_sync(channel_layer.group_send)(
-        f"room_{room.code}",
-        {
-            "type": "sync.match",
-            "matches": [
-                {
-                    "id": match.id,
-                    "players": [
-                        {"id": match_player.player.id}
-                        for match_player in MatchPlayer.objects.filter(match=match).select_related('player')
-                    ]
-                }
-                for match in matches
-            ]
-        }
-    )

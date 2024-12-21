@@ -339,3 +339,47 @@ class RemovePlayerView(View):
                 'playerId': player_id
             }
         )
+
+class LockTournamentView(View):
+    def post(self, request, room_code):
+        try:
+            room = Room.objects.get(code=room_code)
+            userId = request.headers.get("X-User-Id")
+            user = Player.objects.filter(roomCode=room.code, id=userId).first()
+            if user is None:
+                return JsonResponse({'errorCode': '403', 'message': 'Forbidden'}, status=403)
+
+            if user.id != room.createdBy:
+                return JsonResponse({'errorCode': '403', 'message': 'Forbidden'}, status=403)
+            
+            if room.type != roomTypes.TOURNAMENT.value:
+                return JsonResponse({'errorCode': '400', 'message': 'Bad request'}, status=400)
+            
+            if room.amountOfPlayers != room.maxAmountOfPlayers:
+                return JsonResponse({'errorCode': '400', 'message': 'Bad request'}, status=400)
+
+            room.status = RoomStatus.READY_FOR_START.value
+            room.save()
+
+            matches = Match.objects.filter(room=room)
+
+            channel_layer = get_channel_layer()
+            async_to_sync(channel_layer.group_send)(
+                f"room_{room.code}",
+                {
+                    "type": "sync.match",
+                    "matches": [
+                        {
+                            "id": match.id,
+                            "players": [
+                                {"id": match_player.player.id}
+                                for match_player in MatchPlayer.objects.filter(match=match).select_related('player')
+                            ]
+                        }
+                        for match in matches
+                    ]
+                }
+            )
+            return JsonResponse({}, status=201)
+        except Room.DoesNotExist:
+            return JsonResponse({'errorCode': '404', 'message': 'Room not found'}, status=404)
