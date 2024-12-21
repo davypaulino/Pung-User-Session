@@ -28,7 +28,7 @@ class OrchestratorListener:
             match.gameId = data["gameId"]
 
         if data["type"] == "game-started":
-            match.status = 1
+            match.status = 2
 
         if data["type"] == "game-over":
             players = await sync_to_async(list)(
@@ -41,7 +41,7 @@ class OrchestratorListener:
                     player.position = player_data["rank"]
                     await sync_to_async(player.save)()
 
-            match.status = 2
+            match.status = 3
             match.winner = data["winner"]
             await sync_to_async(match.save)()
 

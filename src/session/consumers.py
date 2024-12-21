@@ -6,6 +6,9 @@ from asgiref.sync import sync_to_async
 
 class RoomConsumer(AsyncWebsocketConsumer):
     async def connect(self):
+        # cookies_header = dict(self.scope['headers']).get(b'cookie', b'').decode('utf-8')
+        # cookies = dict(item.split("=") for item in cookies_header.split("; ") if "=" in item)
+        # self.user_id = cookies.get("userId")   
         self.user_id = self.scope['query_string'].decode("utf-8").split("userId=")[-1]
         self.room_name = self.scope['url_route']['kwargs']['room_code']
         self.room_group_name = f"room_{self.room_name}"

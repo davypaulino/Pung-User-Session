@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import RoomStatusView, CreateRoomView, RoomView, TournamentView, RoomGetView, AddPlayerToRoomView, RemovePlayerView, LockTournamentView
+from .views import RoomStatusView, CreateRoomView, RoomView, TournamentView, RoomGetView, AddPlayerToRoomView, RemovePlayerView, LockTournamentView, SetTournamentRoundView
 
 urlpatterns = [
     path('', RoomGetView.as_view(), name='rooms'),
@@ -11,4 +11,5 @@ urlpatterns = [
     path('<str:room_code>/add-player/', AddPlayerToRoomView.as_view(), name='add-player'),
     path('<str:room_code>/<str:player_id>/remove-player/', RemovePlayerView.as_view(), name='remove-player'),
     path('<str:room_code>/lock-tournament/', LockTournamentView.as_view(), name='lock-tournament'),
+    path('<str:game_id>/set-tournament-round/', SetTournamentRoundView.as_view(), name='round-tournament'),
 ]

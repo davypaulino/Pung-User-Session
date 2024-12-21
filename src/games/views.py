@@ -70,6 +70,7 @@ class GameView(View):
         message = {
             "type": "create_game",
             "roomId": room.id,
+            "roomType": room.type,
             "matchId": match.id,
             "isSinglePlayer": isSinglePlayer,
             "ownerId": user_id,

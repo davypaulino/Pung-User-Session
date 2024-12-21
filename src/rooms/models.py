@@ -49,6 +49,7 @@ class Room(models.Model):
     type = models.IntegerField(choices=TYPE_CHOICES, default=0)
     status = models.IntegerField(choices=STATUS_CHOICES, default=0)
     privateRoom = models.BooleanField(default=False)
+    stage = models.IntegerField(default=1)
     createdBy = models.CharField(max_length=64)
     createdAt = models.DateTimeField(auto_now_add=True)
     updatedBy = models.CharField(max_length=64)

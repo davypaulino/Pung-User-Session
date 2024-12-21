@@ -90,6 +90,8 @@ def setFirstRound(room, first_round_matches):
         # Correctly assign 'match' and 'player' foreign keys
         MatchPlayer.objects.create(match=match, player=player_one, position=1)
         MatchPlayer.objects.create(match=match, player=player_two)
+        match.status = 1
+        match.save()
 
 def createTournamentMatches(room):
     number_of_rounds = math.ceil(math.log2(room.maxAmountOfPlayers))
