@@ -6,6 +6,7 @@ from asgiref.sync import sync_to_async
 
 class RoomConsumer(AsyncWebsocketConsumer):
     async def connect(self):
+        self.user_id = self.scope['query_string'].decode("utf-8").split("userId=")[-1]
         self.room_name = self.scope['url_route']['kwargs']['room_code']
         self.room_group_name = f"room_{self.room_name}"
 
@@ -37,6 +38,18 @@ class RoomConsumer(AsyncWebsocketConsumer):
     async def game_started(self, event):
         ##logger.info(f"Starting | {GameSessionConsumer.__name__} | game_update | User {self.userId} send a movement to {self.gameId}.")
         await self.send(text_data=json.dumps(event))
+
+    async def sync_match(self, event):
+        matches = event.get("matches", [])
+        for match in matches:
+            players = match.get("players", [])
+            for player in players:
+                if player["id"] == self.user_id:
+                    await self.channel_layer.group_add(
+                        f"{self.room_group_name}_{match['id']}",
+                        self.channel_name,
+                    )
+                    return
 
 class PlayerScoreConsumer(AsyncWebsocketConsumer):
     async def connect(self):
