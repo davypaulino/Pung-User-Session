@@ -424,18 +424,20 @@ class SetTournamentRoundView(View):
         # if user is None:
         #     return JsonResponse({'errorCode': '403', 'message': 'Forbidden'}, status=403)
 
-        room = Room.objects.filter(code=game_id).first()
         if room is None:
             return JsonResponse({'errorCode': '410', 'message': 'Room not found'}, status=410)
-        match = Match.objects.filter(room=room).first()
         if match is None:
             return JsonResponse({'errorCode': '411', 'message': 'Match not found'}, status=411)
-        winner = Player.objects.filter(id=match.winner).first()sdf\z
         if winner is None:
             return JsonResponse({'errorCode': '412', 'message': 'Match winner not found'}, status=412)
-        nextMatch = Match.objects.filter(id=match.nextMatch).first()
         if nextMatch is None:
             return JsonResponse({'errorCode': '413', 'message': 'Next match not found'}, status=413)
+        
+        
+        room = Room.objects.filter(code=game_id).first()
+        match = Match.objects.filter(room=room).first()
+        winner = Player.objects.filter(id=match.winner).first()
+        nextMatch = Match.objects.filter(id=match.nextMatch).first()
         MatchPlayer.objects.create(match=nextMatch, player=winner)
 
         return JsonResponse({}, status=201)

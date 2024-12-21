@@ -1,7 +1,8 @@
 import json
 
 from channels.generic.websocket import AsyncWebsocketConsumer
-from rooms.models import Room
+from rooms.models import Room, Match
+from players.models import MatchPlayer, Player
 from asgiref.sync import sync_to_async
 
 class RoomConsumer(AsyncWebsocketConsumer):
@@ -12,6 +13,13 @@ class RoomConsumer(AsyncWebsocketConsumer):
         self.user_id = self.scope['query_string'].decode("utf-8").split("userId=")[-1]
         self.room_name = self.scope['url_route']['kwargs']['room_code']
         self.room_group_name = f"room_{self.room_name}"
+
+        matchplayer = MatchPlayer.objects.filter(player_id=self.user_id, ).first()
+        if matchplayer is not None:
+            if (matchplayer.match.winner == matchplayer.player.id):
+                nextMatch = Match.objects.filter(id=matchplayer.nextMatch).first()
+                if nextMatch is not None:
+                    MatchPlayer.objects.create(match=matchplayer.nextMatch, player=matchplayer.player, score=0)
 
         await self.channel_layer.group_add(
             self.room_group_name,
