@@ -19,32 +19,34 @@ class OrchestratorListener:
 
     @sync_to_async
     def increment_stage(self, match):
-        if match.room:            
+        if match.room:
             match.room.stage = match.stage
             match.room.save()
+        else:
+            logger.error(f"Error | {OrchestratorListener.__name__} | increment_stage | Match {match.id} | Room not found.")
 
     async def process_game_sync(self, message):
+        logger.info(f"\033[93mOrchestrator recebeu mensagem {message}\033[0m")
         try:
             data = json.loads(message)
-        except json.JSONDecodeError:
-            return
+        except json.JSONDecodeError as e:
+            return logger.error(f"Error | {OrchestratorListener.__name__} | process_game_sync | {e}")
 
         match = await Match.objects.filter(id=data["matchId"]).afirst()
         if (match is None):
-            return
-    
+            return logger.error(f"Error | {OrchestratorListener.__name__} | process_game_sync | {e}")
+
         if data["type"] == "game-created":
-            logger.info(f"Stating | {OrchestratorListener.__name__} | game-created | Match {match.id} | Game {match.gameId}.")
+            logger.info(f"{OrchestratorListener.__name__} | game-created | Match {match.id} | Game {match.gameId}.")
             match.gameId = data["gameId"]
-            logger.info(f"Finished | {OrchestratorListener.__name__} | game-created | Match {match.id} | Game {match.gameId}.")
 
         if data["type"] == "game-started":
-            logger.info(f"Stating | {OrchestratorListener.__name__} | game-started | Match {match.id} | Game {match.gameId}.")
+            logger.info(f"{OrchestratorListener.__name__} | game-started | Match {match.id} | Game {match.gameId}.")
             match.status = 2
-            logger.info(f"Finished | {OrchestratorListener.__name__} | game-started | Match {match.id} | Game {match.gameId}.")
+
 
         if data["type"] == "game-over":
-            logger.info(f"Stating | {OrchestratorListener.__name__} | game-over | Match {match.id} | Game {match.gameId}.")
+            logger.info(f"{OrchestratorListener.__name__} | game-over | Match {match.id} | Game {match.gameId}.")
             players = await sync_to_async(list)(
                 match.players_in_match.select_related("player").all()
             )
@@ -58,7 +60,7 @@ class OrchestratorListener:
             match.status = 3
             match.winner = data["winner"]
 
-            
+
             if (match.nextMatch is not None):
                 next_match = await Match.objects.filter(id=match.nextMatch).afirst()
                 winner = await Player.objects.filter(id=match.winner).afirst()
@@ -71,7 +73,7 @@ class OrchestratorListener:
                         await self.increment_stage(next_match)
                         await next_match.asave()
             logger.info(f"Finished | {OrchestratorListener.__name__} | game-over | Match {match.id} | Game {match.gameId}.")
-        
+
         await match.asave()
 
     async def listen(self):

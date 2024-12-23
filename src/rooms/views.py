@@ -144,16 +144,16 @@ class RoomView(View):
         userId = request.headers.get("X-User-Id")
         if userId is None:
             return JsonResponse({'errorCode': '401', 'message': 'Unauthorized'}, status=401)
-        
+
         room = Room.objects.filter(code=room_code).first()
         if room is None:
             return JsonResponse({}, status=204)
-        
+
         players = Player.objects.filter(roomCode=room_code)
         user = players.filter(id=userId).first()
         if room.createdBy != user.id:
             return JsonResponse({'errorCode': '403', 'message': 'Forbidden'}, status=403)
-        
+
         channel_layer = get_channel_layer()
         async_to_sync(channel_layer.group_send)(
             f"room_{room_code}",
@@ -170,7 +170,7 @@ class RoomView(View):
             user = Player.objects.filter(roomCode=room.code, id=userId).first()
             if user is None:
                 return JsonResponse({'errorCode': '403', 'message': 'Forbidden'}, status=403)
-            
+
             players = Player.objects.filter(roomCode=room.code)
             players_data = [
                 {
@@ -206,7 +206,7 @@ class TournamentView(View):
             user = Player.objects.filter(roomCode=room.code, id=userId).first()
             if user is None:
                 return JsonResponse({'errorCode': '403', 'message': 'Forbidden'}, status=403)
-            
+
             players_data = {}
             matchsCount = room.maxAmountOfPlayers // 2 ** (room.stage - 1)
             total_positions = matchsCount * 2
@@ -239,14 +239,14 @@ class TournamentView(View):
                     position: players_data.get(position, None)  # Use None para posições sem jogadores
                     for position in range(1, total_positions + 1)
                 }
-          
-            matchPlayer = MatchPlayer.objects.filter(player=user).first()
+
             owner = False
             if user.bracketsPosition % 2 != 0:
                 owner = True
 
             return JsonResponse(
                 {
+                    'playersData': userId,
                     'round': room.stage,
                     'roomId': room.id,
                     'roomType': room.type,
@@ -259,6 +259,8 @@ class TournamentView(View):
                     'owner': owner,
                     'tournamentOwner': user.id == room.createdBy,
                     'matchsCount': matchsCount,
+                    #TODO: O ERRO DOS VENCEDORES PODE ESTAR AQUI
+                    'winner': True if Match.objects.filter(room=room, winner=userId).exists() else False
                 }
             )
         except Room.DoesNotExist:
@@ -291,7 +293,7 @@ class AddPlayerToRoomView(View):
             data = json.loads(request.body)
         except json.JSONDecodeError:
             return JsonResponse({'errorCode': '401', 'message': 'Bad Request'}, status=400)
-        
+
         try:
             player_name = validate_name_field(data, "playerName")
         except (ValueError, TypeError) as e:
@@ -304,7 +306,7 @@ class AddPlayerToRoomView(View):
 
             if room.players.count() >= room.maxAmountOfPlayers:
                 return JsonResponse({'errorCode': '403', 'message': 'Room is full'}, status=403)
-            
+
             player = Player.objects.create(
                 name=player_name,
                 roomCode=room_code,
@@ -382,10 +384,10 @@ class LockTournamentView(View):
 
             if user.id != room.createdBy:
                 return JsonResponse({'errorCode': '403', 'message': 'Forbidden'}, status=403)
-            
+
             if room.type != roomTypes.TOURNAMENT.value:
                 return JsonResponse({'errorCode': '400', 'message': 'Bad request'}, status=400)
-            
+
             if room.amountOfPlayers != room.maxAmountOfPlayers:
                 return JsonResponse({'errorCode': '400', 'message': 'Bad request'}, status=400)
 
@@ -415,3 +417,5 @@ class LockTournamentView(View):
             return JsonResponse({}, status=201)
         except Room.DoesNotExist:
             return JsonResponse({'errorCode': '404', 'message': 'Room not found'}, status=404)
+
+
