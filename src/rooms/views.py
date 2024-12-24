@@ -210,6 +210,7 @@ class TournamentView(View):
             players_data = {}
             matchsCount = room.maxAmountOfPlayers // 2 ** (room.stage - 1)
             total_positions = matchsCount * 2
+            num_players = room.amountOfPlayers
             if room.stage == 1:
                 for i in range(1, matchsCount + 1):
                     player = Player.objects.filter(roomCode=room.code, bracketsPosition=i).first()
@@ -238,27 +239,31 @@ class TournamentView(View):
                         }
                 players_data = {
                     position: players_info.get(position, None)
-                    for position in range(1, total_positions + 1)
+                    for position in range(1, matchsCount + 1)
                 }
+
+                num_players = matchsCount
+
                 matches = Match.objects.filter(room=room, stage=room.stage)
 
-                channel_layer = get_channel_layer()
-                async_to_sync(channel_layer.group_send)(
-                    f"room_{room.code}",
-                    {
-                        "type": "sync.match",
-                        "matches": [
-                            {
-                                "id": match.id,
-                                "players": [
-                                    {"id": match_player.player.id}
-                                    for match_player in MatchPlayer.objects.filter(match=match).select_related('player')
-                                ]
-                            }
-                            for match in matches
-                        ]
-                    }
-                )
+                if matches.count() == matchsCount // 2:
+                    channel_layer = get_channel_layer()
+                    async_to_sync(channel_layer.group_send)(
+                        f"room_{room.code}",
+                        {
+                            "type": "sync.match",
+                            "matches": [
+                                {
+                                    "id": match.id,
+                                    "players": [
+                                        {"id": match_player.player.id}
+                                        for match_player in MatchPlayer.objects.filter(match=match).select_related('player')
+                                    ]
+                                }
+                                for match in matches
+                            ]
+                        }
+                    )
 
             owner = False
             if user.bracketsPosition % 2 != 0:
@@ -273,7 +278,7 @@ class TournamentView(View):
                     'roomCode': room.code,
                     'roomName': room.name,
                     'maxNumberOfPlayers': matchsCount,
-                    'numberOfPlayers': room.amountOfPlayers,
+                    'numberOfPlayers': num_players,
                     'createdBy': room.createdBy,
                     'players': players_data,
                     'owner': owner,
