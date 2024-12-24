@@ -22,8 +22,15 @@ class OrchestratorListener:
         if match.room:
             match.room.stage = match.stage
             match.room.save()
+            logger.info(f"INCREMENT STAGE Match {match.id} stage: {match.stage}, Room {match.room.id} stage: {match.room.stage}")
         else:
             logger.error(f"Error | {OrchestratorListener.__name__} | increment_stage | Match {match.id} | Room not found.")
+
+    @sync_to_async
+    def update_bracket_position(self, player, position):
+        player.bracketsPosition = position
+        player.save()
+        logger.info(f"UPDATE POSITION Player {player.id} {player.name}, Position {player.bracketsPosition}")
 
     async def process_game_sync(self, message):
         logger.info(f"\033[93mOrchestrator recebeu mensagem {message}\033[0m")
@@ -69,9 +76,13 @@ class OrchestratorListener:
 
                     as_players = await MatchPlayer.objects.filter(match=next_match).acount()
                     if as_players == 2:
+                        await self.update_bracket_position(winner, 2)
                         next_match.status = 1
                         await self.increment_stage(next_match)
                         await next_match.asave()
+                    else:
+                        await self.update_bracket_position(winner, 1)
+                    
             logger.info(f"Finished | {OrchestratorListener.__name__} | game-over | Match {match.id} | Game {match.gameId}.")
 
         await match.asave()
