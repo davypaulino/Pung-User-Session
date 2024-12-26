@@ -29,6 +29,10 @@ class OrchestratorListener:
     @sync_to_async
     def update_bracket_position(self, player, position):
         player.bracketsPosition = position
+        if player.bracketsPosition % 2 == 0:
+            player.profileColor = 1
+        else:
+            player.profileColor = 0
         player.save()
         logger.info(f"UPDATE POSITION Player {player.id} {player.name}, Position {player.bracketsPosition}")
 

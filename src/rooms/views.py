@@ -277,6 +277,7 @@ class TournamentView(View):
                     'roomType': room.type,
                     'roomCode': room.code,
                     'roomName': room.name,
+                    'roomStatus': room.status,
                     'maxNumberOfPlayers': matchsCount,
                     'numberOfPlayers': num_players,
                     'createdBy': room.createdBy,
@@ -439,6 +440,9 @@ class LockTournamentView(View):
                     ]
                 }
             )
+
+            update_players_list(room_code, "")
+
             return JsonResponse({}, status=201)
         except Room.DoesNotExist:
             return JsonResponse({'errorCode': '404', 'message': 'Room not found'}, status=404)
