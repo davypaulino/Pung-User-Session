@@ -223,6 +223,7 @@ class TournamentView(View):
                     else:
                         players_data[i] = None
             else:
+                players_info = {}
                 for match in Match.objects.filter(room=room, status=1):
                     matchPlayers = MatchPlayer.objects.filter(match=match)
                     if matchPlayers.count() == 0:
@@ -230,13 +231,13 @@ class TournamentView(View):
                     if matchPlayers.count() != 2:
                         return JsonResponse({'errorCode': '400', 'message': 'Match not filled'}, status=400)
                     players = [matchPlayer.player for matchPlayer in matchPlayers]
-                    players_info = {}
                     for player in players:
                         players_info[player.bracketsPosition] = {
                             "name": player.name,
                             "urlProfileImage": player.urlProfileImage,
                             "color": player.profileColor
                         }
+
                 players_data = {
                     position: players_info.get(position, None)
                     for position in range(1, matchsCount + 1)
@@ -246,24 +247,6 @@ class TournamentView(View):
 
                 matches = Match.objects.filter(room=room, stage=room.stage)
 
-                if matches.count() == matchsCount // 2:
-                    channel_layer = get_channel_layer()
-                    async_to_sync(channel_layer.group_send)(
-                        f"room_{room.code}",
-                        {
-                            "type": "sync.match",
-                            "matches": [
-                                {
-                                    "id": match.id,
-                                    "players": [
-                                        {"id": match_player.player.id}
-                                        for match_player in MatchPlayer.objects.filter(match=match).select_related('player')
-                                    ]
-                                }
-                                for match in matches
-                            ]
-                        }
-                    )
 
             owner = False
             if user.bracketsPosition % 2 != 0:

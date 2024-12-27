@@ -7,6 +7,7 @@ import logging
 from rooms.models import Match, Room
 from asgiref.sync import sync_to_async
 from players.models import Player, MatchPlayer
+from channels.layers import get_channel_layer
 
 redis_client = redis.Redis(host=os.environ.get("REDIS_HOST", "localhost"), port=int(os.environ.get("REDIS_PORT", 6379)), db=0, decode_responses=True)
 
@@ -83,6 +84,11 @@ class OrchestratorListener:
                         await self.update_bracket_position(winner, 2)
                         next_match.status = 1
                         await self.increment_stage(next_match)
+                        channel_layer = get_channel_layer()
+
+                        match_players = MatchPlayer.objects.filter(match=next_match).select_related('player')
+
+                        asyncio.create_task(self.send_sync_match_message(channel_layer, next_match, match_players))
                         await next_match.asave()
                     else:
                         await self.update_bracket_position(winner, 1)
@@ -98,3 +104,36 @@ class OrchestratorListener:
             if message is None:
                 continue
             await self.process_game_sync(message)
+    
+    async def send_sync_match_message(self, channel_layer, next_match, match_players):
+        logger.info(f"Starting | {OrchestratorListener.__name__} | {self.send_sync_match_message.__name__}.")
+        while True:
+            logger.info(f"Waiting user enter in the room.")
+            # Obtenha a lista de jogadores e verifique o estado de conexão
+            players_connected = await match_players.filter(player__isConnected=True).acount()
+            total_players = await match_players.acount()
+
+            # Verifique se todos os jogadores estão conectados
+            if players_connected == total_players:
+                break
+
+            # Aguarde um curto intervalo antes de verificar novamente
+            await asyncio.sleep(5)
+        
+        players_list = [
+            {"id": match_player.player.id}
+            async for match_player in match_players
+        ]
+
+        await channel_layer.group_send(
+            f"room_{next_match.room.code}",
+            {
+                "type": "sync.match",
+                "matches": [
+                    {
+                        "id": next_match.id,
+                        "players": players_list,
+                    }
+                ],
+            },
+        )
