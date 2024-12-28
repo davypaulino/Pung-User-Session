@@ -74,6 +74,7 @@ class GameView(View):
             "roomType": room.type,
             "matchId": match.id,
             "isSinglePlayer": isSinglePlayer,
+            "stage": room.stage,
             "ownerId": user_id,
             "players": [
                 {
@@ -123,6 +124,7 @@ class TournamentGameView(View):
                 "roomType": room.type,
                 "matchId": match.id,
                 "isSinglePlayer": False,
+                "stage": room.stage,
                 "ownerId": user_id,
                 "players": [
                     {

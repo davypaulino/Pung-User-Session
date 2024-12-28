@@ -124,3 +124,13 @@ def createTournamentMatches(room):
 
     # Assign players to first round matches
     setFirstRound(room, matches[1])
+
+def update_players_list(room_code, userRemoved):
+    channel_layer = get_channel_layer()
+    async_to_sync(channel_layer.group_send)(
+        f"room_{room_code}",
+        {
+            "type": "player_list_update",
+            "userRemoved": userRemoved,
+        }
+    )

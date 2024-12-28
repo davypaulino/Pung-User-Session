@@ -10,7 +10,7 @@ from django.db.models import F, Q
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
-from .utils import validate_field, validate_amount_players, validate_integer_field, validate_name_field, setPlayerColor, setBracketsPosition, createTournamentMatches
+from .utils import validate_field, validate_amount_players, validate_integer_field, validate_name_field, setPlayerColor, setBracketsPosition, createTournamentMatches, update_players_list
 
 from .models import Room, roomTypes, RoomStatus, Match
 from players.models import Player, playerColors, MatchPlayer
@@ -222,6 +222,10 @@ class TournamentView(View):
                         }
                     else:
                         players_data[i] = None
+            elif room.stage == 0:
+                players_data = {}
+                matchsCount = 0
+                num_players = 0
             else:
                 players_info = {}
                 for match in Match.objects.filter(room=room, status=1):
@@ -246,7 +250,6 @@ class TournamentView(View):
                 num_players = matchsCount
 
                 matches = Match.objects.filter(room=room, stage=room.stage)
-
 
             owner = False
             if user.bracketsPosition % 2 != 0:
@@ -282,16 +285,6 @@ class RoomStatusView(View):
             return JsonResponse({'status': str(room.status)})
         except Room.DoesNotExist:
             return JsonResponse({'errorCode': '404', 'message': 'Room status not found'}, status=404)
-
-def update_players_list(room_code, userRemoved):
-    channel_layer = get_channel_layer()
-    async_to_sync(channel_layer.group_send)(
-        f"room_{room_code}",
-        {
-            "type": "player_list_update",
-            "userRemoved": userRemoved,
-        }
-    )
 
 class AddPlayerToRoomView(View):
     def put(self, request, room_code):
@@ -429,5 +422,3 @@ class LockTournamentView(View):
             return JsonResponse({}, status=201)
         except Room.DoesNotExist:
             return JsonResponse({'errorCode': '404', 'message': 'Room not found'}, status=404)
-
-

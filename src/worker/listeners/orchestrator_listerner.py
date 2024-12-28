@@ -28,6 +28,11 @@ class OrchestratorListener:
             logger.error(f"Error | {OrchestratorListener.__name__} | increment_stage | Match {match.id} | Room not found.")
 
     @sync_to_async
+    def update_stage_tournament_ended(self, match):
+        match.room.stage = 0
+        match.room.save()
+
+    @sync_to_async
     def update_bracket_position(self, player, position):
         player.bracketsPosition = position
         if player.bracketsPosition % 2 == 0:
@@ -56,7 +61,6 @@ class OrchestratorListener:
             logger.info(f"{OrchestratorListener.__name__} | game-started | Match {match.id} | Game {match.gameId}.")
             match.status = 2
 
-
         if data["type"] == "game-over":
             logger.info(f"{OrchestratorListener.__name__} | game-over | Match {match.id} | Game {match.gameId}.")
             players = await sync_to_async(list)(
@@ -71,7 +75,6 @@ class OrchestratorListener:
 
             match.status = 3
             match.winner = data["winner"]
-
 
             if (match.nextMatch is not None):
                 next_match = await Match.objects.filter(id=match.nextMatch).afirst()
@@ -92,7 +95,9 @@ class OrchestratorListener:
                         await next_match.asave()
                     else:
                         await self.update_bracket_position(winner, 1)
-                    
+            else:
+                await self.update_stage_tournament_ended(match)
+
             logger.info(f"Finished | {OrchestratorListener.__name__} | game-over | Match {match.id} | Game {match.gameId}.")
 
         await match.asave()
@@ -100,6 +105,7 @@ class OrchestratorListener:
     async def listen(self):
         while True:
             await asyncio.sleep(1)
+            message = {}
             message = redis_client.lpop(self.queue_name)
             if message is None:
                 continue

@@ -6,6 +6,7 @@ from rooms.models import Room, Match
 from players.models import MatchPlayer, Player
 from asgiref.sync import sync_to_async
 from .repository import SessionRepository
+from rooms.utils import update_players_list
 
 class RoomConsumer(AsyncWebsocketConsumer):
     async def connect(self):
@@ -21,6 +22,8 @@ class RoomConsumer(AsyncWebsocketConsumer):
             self.room_group_name,
             self.channel_name
         )
+
+        await sync_to_async(update_players_list)(self.room_name, "")
 
         match = await self.repository.get_match_by_player_id_and_status(self.user_id)
         if match is not None:
@@ -72,6 +75,8 @@ class RoomConsumer(AsyncWebsocketConsumer):
         await self.send(text_data=json.dumps(event))
         return logging.error(f"{RoomConsumer.__name__} | User {self.user_id} not found in matches")
 
+    async def tournament_ended(self, event):
+        await self.send(text_data=json.dumps(event))
 
 class PlayerScoreConsumer(AsyncWebsocketConsumer):
     async def connect(self):
