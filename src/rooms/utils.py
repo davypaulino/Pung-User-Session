@@ -90,6 +90,8 @@ def setFirstRound(room, first_round_matches):
         # Correctly assign 'match' and 'player' foreign keys
         MatchPlayer.objects.create(match=match, player=player_one, position=1)
         MatchPlayer.objects.create(match=match, player=player_two)
+        match.status = 1
+        match.save()
 
 def createTournamentMatches(room):
     number_of_rounds = math.ceil(math.log2(room.maxAmountOfPlayers))
@@ -122,3 +124,13 @@ def createTournamentMatches(room):
 
     # Assign players to first round matches
     setFirstRound(room, matches[1])
+
+def update_players_list(room_code, userRemoved):
+    channel_layer = get_channel_layer()
+    async_to_sync(channel_layer.group_send)(
+        f"room_{room_code}",
+        {
+            "type": "player_list_update",
+            "userRemoved": userRemoved,
+        }
+    )

@@ -1,6 +1,6 @@
 from django.http import JsonResponse, HttpResponse
 from django.views import View
-from .models import Player
+from .models import Player, MatchPlayer
 from rooms.models import Room, Match
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
@@ -26,8 +26,15 @@ class PlayerView(View):
 
 class PlayersInfoView(View):
     def get(self, request, game_id):
+        
         match = Match.objects.filter(gameId=game_id).first()
-        players = Player.objects.filter(matches_played__match=match).distinct()
+        if match is None:
+            return JsonResponse({}, status=204)
+        matchPlayers = MatchPlayer.objects.filter(match=match).select_related("player").all()
+        players = [matchPlayer.player for matchPlayer in matchPlayers]
+            
+        # match = Match.objects.filter(gameId=game_id).first()
+        # players = Player.objects.filter(matches_played__match=match).distinct()
         # players = Player.objects.filter(roomCode=room_code)
         if players is None:
             return JsonResponse({}, status=204)

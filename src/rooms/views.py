@@ -1,5 +1,6 @@
 import json
 import random
+import logging
 
 from django.http import JsonResponse
 from django.http import HttpResponse
@@ -9,10 +10,12 @@ from django.db.models import F, Q
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
-from .utils import validate_field, validate_amount_players, validate_integer_field, validate_name_field, setPlayerColor, setBracketsPosition, createTournamentMatches
+from .utils import validate_field, validate_amount_players, validate_integer_field, validate_name_field, setPlayerColor, setBracketsPosition, createTournamentMatches, update_players_list
 
 from .models import Room, roomTypes, RoomStatus, Match
 from players.models import Player, playerColors, MatchPlayer
+
+logger = logging.getLogger(__name__)
 
 class RoomGetView(View):
     def get(self, request):
@@ -105,7 +108,10 @@ class CreateRoomView(View):
 
         if new_room.type == roomTypes.TOURNAMENT.value:
             new_player.bracketsPosition = setBracketsPosition(new_room.code)
-            new_player.profileColor = new_player.bracketsPosition % 2
+            if new_player.bracketsPosition % 2 == 0:
+                new_player.profileColor = 1
+            else:
+                new_player.profileColor = 0
             new_player.save()
 
         new_room.createdBy = new_player.id
@@ -138,16 +144,16 @@ class RoomView(View):
         userId = request.headers.get("X-User-Id")
         if userId is None:
             return JsonResponse({'errorCode': '401', 'message': 'Unauthorized'}, status=401)
-        
+
         room = Room.objects.filter(code=room_code).first()
         if room is None:
             return JsonResponse({}, status=204)
-        
+
         players = Player.objects.filter(roomCode=room_code)
         user = players.filter(id=userId).first()
         if room.createdBy != user.id:
             return JsonResponse({'errorCode': '403', 'message': 'Forbidden'}, status=403)
-        
+
         channel_layer = get_channel_layer()
         async_to_sync(channel_layer.group_send)(
             f"room_{room_code}",
@@ -164,7 +170,7 @@ class RoomView(View):
             user = Player.objects.filter(roomCode=room.code, id=userId).first()
             if user is None:
                 return JsonResponse({'errorCode': '403', 'message': 'Forbidden'}, status=403)
-            
+
             players = Player.objects.filter(roomCode=room.code)
             players_data = [
                 {
@@ -200,37 +206,73 @@ class TournamentView(View):
             user = Player.objects.filter(roomCode=room.code, id=userId).first()
             if user is None:
                 return JsonResponse({'errorCode': '403', 'message': 'Forbidden'}, status=403)
-            
-            players_data = {}
-            for i in range(1, room.maxAmountOfPlayers + 1):
-                player = Player.objects.filter(roomCode=room.code, bracketsPosition=i).first()
-                if player:
-                    players_data[i] = {
-                        "name": player.name,
-                        "urlProfileImage": player.urlProfileImage,
-                        "color": player.profileColor
-                    }
-                else:
-                    players_data[i] = None
 
-            matchPlayer = MatchPlayer.objects.filter(player=user).first()
+            players_data = {}
+            matchsCount = room.maxAmountOfPlayers // 2 ** (room.stage - 1)
+            total_positions = matchsCount * 2
+            num_players = room.amountOfPlayers
+            if room.stage == 1:
+                for i in range(1, matchsCount + 1):
+                    player = Player.objects.filter(roomCode=room.code, bracketsPosition=i).first()
+                    if player:
+                        players_data[i] = {
+                            "name": player.name,
+                            "urlProfileImage": player.urlProfileImage,
+                            "color": player.profileColor
+                        }
+                    else:
+                        players_data[i] = None
+            elif room.stage == 0:
+                players_data = {}
+                matchsCount = 0
+                num_players = 0
+            else:
+                players_info = {}
+                for match in Match.objects.filter(room=room, status=1):
+                    matchPlayers = MatchPlayer.objects.filter(match=match)
+                    if matchPlayers.count() == 0:
+                        return JsonResponse({'errorCode': '404', 'message': 'Match not found'}, status=404)
+                    if matchPlayers.count() != 2:
+                        return JsonResponse({'errorCode': '400', 'message': 'Match not filled'}, status=400)
+                    players = [matchPlayer.player for matchPlayer in matchPlayers]
+                    for player in players:
+                        players_info[player.bracketsPosition] = {
+                            "name": player.name,
+                            "urlProfileImage": player.urlProfileImage,
+                            "color": player.profileColor
+                        }
+
+                players_data = {
+                    position: players_info.get(position, None)
+                    for position in range(1, matchsCount + 1)
+                }
+
+                num_players = matchsCount
+
+                matches = Match.objects.filter(room=room, stage=room.stage)
+
             owner = False
             if user.bracketsPosition % 2 != 0:
                 owner = True
 
             return JsonResponse(
                 {
-                    'round': 1,
+                    'playersData': userId,
+                    'round': room.stage,
                     'roomId': room.id,
                     'roomType': room.type,
                     'roomCode': room.code,
                     'roomName': room.name,
-                    'maxNumberOfPlayers': room.maxAmountOfPlayers,
-                    'numberOfPlayers': room.amountOfPlayers,
+                    'roomStatus': room.status,
+                    'maxNumberOfPlayers': matchsCount,
+                    'numberOfPlayers': num_players,
                     'createdBy': room.createdBy,
                     'players': players_data,
                     'owner': owner,
                     'tournamentOwner': user.id == room.createdBy,
+                    'matchsCount': matchsCount,
+                    #TODO: O ERRO DOS VENCEDORES PODE ESTAR AQUI
+                    'winner': True if Match.objects.filter(room=room, winner=userId).exists() else False
                 }
             )
         except Room.DoesNotExist:
@@ -244,16 +286,6 @@ class RoomStatusView(View):
         except Room.DoesNotExist:
             return JsonResponse({'errorCode': '404', 'message': 'Room status not found'}, status=404)
 
-def update_players_list(room_code, userRemoved):
-    channel_layer = get_channel_layer()
-    async_to_sync(channel_layer.group_send)(
-        f"room_{room_code}",
-        {
-            "type": "player_list_update",
-            "userRemoved": userRemoved,
-        }
-    )
-
 class AddPlayerToRoomView(View):
     def put(self, request, room_code):
 
@@ -263,7 +295,7 @@ class AddPlayerToRoomView(View):
             data = json.loads(request.body)
         except json.JSONDecodeError:
             return JsonResponse({'errorCode': '401', 'message': 'Bad Request'}, status=400)
-        
+
         try:
             player_name = validate_name_field(data, "playerName")
         except (ValueError, TypeError) as e:
@@ -276,7 +308,7 @@ class AddPlayerToRoomView(View):
 
             if room.players.count() >= room.maxAmountOfPlayers:
                 return JsonResponse({'errorCode': '403', 'message': 'Room is full'}, status=403)
-            
+
             player = Player.objects.create(
                 name=player_name,
                 roomCode=room_code,
@@ -287,14 +319,17 @@ class AddPlayerToRoomView(View):
 
             if room.type == roomTypes.TOURNAMENT.value:
                 player.bracketsPosition = setBracketsPosition(room.code)
-                player.profileColor = player.bracketsPosition % 2
+                if player.bracketsPosition % 2 == 0:
+                    player.profileColor = 1
+                else:
+                    player.profileColor = 0
                 player.save()
 
             room.amountOfPlayers += 1
             room.save()
             update_players_list(room_code, "")
 
-            if room.type == roomTypes.TOURNAMENT.value and room.amountOfPlayers == room.maxAmountOfPlayers:
+            if room.stage == 1 and room.type == roomTypes.TOURNAMENT.value and room.amountOfPlayers == room.maxAmountOfPlayers:
                 createTournamentMatches(room)
 
             return JsonResponse(
@@ -351,14 +386,15 @@ class LockTournamentView(View):
 
             if user.id != room.createdBy:
                 return JsonResponse({'errorCode': '403', 'message': 'Forbidden'}, status=403)
-            
+
             if room.type != roomTypes.TOURNAMENT.value:
                 return JsonResponse({'errorCode': '400', 'message': 'Bad request'}, status=400)
-            
+
             if room.amountOfPlayers != room.maxAmountOfPlayers:
                 return JsonResponse({'errorCode': '400', 'message': 'Bad request'}, status=400)
 
             room.status = RoomStatus.READY_FOR_START.value
+            # room.stage += 1
             room.save()
 
             matches = Match.objects.filter(room=room)
@@ -380,6 +416,9 @@ class LockTournamentView(View):
                     ]
                 }
             )
+
+            update_players_list(room_code, "")
+
             return JsonResponse({}, status=201)
         except Room.DoesNotExist:
             return JsonResponse({'errorCode': '404', 'message': 'Room not found'}, status=404)

@@ -1,11 +1,19 @@
 import json
+import logging
 
 from channels.generic.websocket import AsyncWebsocketConsumer
-from rooms.models import Room
+from rooms.models import Room, Match
+from players.models import MatchPlayer, Player
 from asgiref.sync import sync_to_async
+from .repository import SessionRepository
+from rooms.utils import update_players_list
 
 class RoomConsumer(AsyncWebsocketConsumer):
     async def connect(self):
+        # cookies_header = dict(self.scope['headers']).get(b'cookie', b'').decode('utf-8')
+        # cookies = dict(item.split("=") for item in cookies_header.split("; ") if "=" in item)
+        # self.user_id = cookies.get("userId")
+        self.repository = SessionRepository()
         self.user_id = self.scope['query_string'].decode("utf-8").split("userId=")[-1]
         self.room_name = self.scope['url_route']['kwargs']['room_code']
         self.room_group_name = f"room_{self.room_name}"
@@ -15,6 +23,17 @@ class RoomConsumer(AsyncWebsocketConsumer):
             self.channel_name
         )
 
+        await sync_to_async(update_players_list)(self.room_name, "")
+
+        match = await self.repository.get_match_by_player_id_and_status(self.user_id)
+        if match is not None:
+            await self.channel_layer.group_add(
+                f"room_{self.room_name}_{match.id}",
+                self.channel_name
+            )
+            logging.info(f"{RoomConsumer.__name__} | User {self.user_id} connected to queue room_{self.room_name}_{match.id}")
+
+        await self.repository.update_player_connected_status(self.user_id, True)
         await self.accept()
 
     async def disconnect(self, close_code):
@@ -22,6 +41,8 @@ class RoomConsumer(AsyncWebsocketConsumer):
             self.room_group_name,
             self.channel_name
         )
+
+        self.repository.update_player_connected_status(self.user_id, True)
 
     async def player_list_update(self, event):
         user_removed = event["userRemoved"]
@@ -34,9 +55,9 @@ class RoomConsumer(AsyncWebsocketConsumer):
         await self.send(text_data=json.dumps({
             "type": "delete_room",
         }))
-        
+
     async def game_started(self, event):
-        ##logger.info(f"Starting | {GameSessionConsumer.__name__} | game_update | User {self.userId} send a movement to {self.gameId}.")
+        logging.info(f"{RoomConsumer.__name__} Game started event: {event}")
         await self.send(text_data=json.dumps(event))
 
     async def sync_match(self, event):
@@ -46,10 +67,16 @@ class RoomConsumer(AsyncWebsocketConsumer):
             for player in players:
                 if player["id"] == self.user_id:
                     await self.channel_layer.group_add(
-                        f"{self.room_group_name}_{match['id']}",
+                        f"room_{self.room_name}_{match['id']}",
                         self.channel_name,
                     )
-                    return
+                    await self.send(text_data=json.dumps(event))
+                    return logging.info(f"{RoomConsumer.__name__} | {self.sync_match.__name__} |  | User {self.user_id} connected to queue room_{self.room_name}_{match['id']}")
+        await self.send(text_data=json.dumps(event))
+        return logging.error(f"{RoomConsumer.__name__} | User {self.user_id} not found in matches")
+
+    async def tournament_ended(self, event):
+        await self.send(text_data=json.dumps(event))
 
 class PlayerScoreConsumer(AsyncWebsocketConsumer):
     async def connect(self):

@@ -18,6 +18,7 @@ redis_client = redis.Redis(host='redis', port=6379, db=0, decode_responses=True)
 class GameView(View):
     def post(self, request, room_code):
         user_id = request.headers.get('X-User-Id')
+        logger.info(f"{GameView.__name__} | recebeu uma requisicao")
         if user_id is None:
             return HttpResponse(f"User ID not found", status=400)
 
@@ -33,7 +34,7 @@ class GameView(View):
 
         room.status = RoomStatus.CREATING_GAME
         room.save()
-        
+
         isSinglePlayer = False
         if (room.amountOfPlayers == 1):
             isSinglePlayer = True
@@ -66,12 +67,14 @@ class GameView(View):
                 ]
             }
         )
-        
+
         message = {
             "type": "create_game",
             "roomId": room.id,
+            "roomType": room.type,
             "matchId": match.id,
             "isSinglePlayer": isSinglePlayer,
+            "stage": room.stage,
             "ownerId": user_id,
             "players": [
                 {
@@ -83,6 +86,7 @@ class GameView(View):
             ]
         }
 
+        logger.info(f"{GameView.__name__} | ENVIANDO MSG {json.dumps(message)}")
         redis_client.rpush("create-game-queue", json.dumps(message))
         return HttpResponse(f"Game created for room {room_code}", status=201)
 
@@ -105,8 +109,11 @@ class TournamentGameView(View):
 
         try:
             player_one = Player.objects.filter(id=user_id).first()
-
-            matchPlayer = MatchPlayer.objects.filter(player=player_one).first()
+            if player_one is None:
+                return HttpResponse(f"Player {user_id} not found", status=400)
+            matchPlayer = MatchPlayer.objects.filter(player=player_one, match__stage=room.stage).first()
+            if (matchPlayer is None):
+                return HttpResponse(f"you lost!", status=401)
             match = matchPlayer.match
             secondMatchPlayer = MatchPlayer.objects.filter(match=match).exclude(player=player_one).first()
             player_two = secondMatchPlayer.player
@@ -117,6 +124,7 @@ class TournamentGameView(View):
                 "roomType": room.type,
                 "matchId": match.id,
                 "isSinglePlayer": False,
+                "stage": room.stage,
                 "ownerId": user_id,
                 "players": [
                     {
@@ -131,9 +139,9 @@ class TournamentGameView(View):
                     }
                 ]
             }
+            logger.info(f"{TournamentGameView.__name__} | ENVIANDO MSG {json.dumps(message)}")
+            redis_client.rpush("create-game-queue", json.dumps(message))
+            return HttpResponse(f"Game created for room {room_code}", status=201)
         except Exception as e:
             logger.error(f"Error creating game for room {room_code}: {str(e)}")
             return HttpResponse(f"Error creating game for room {room_code}", status=500)
-
-        redis_client.rpush("create-game-queue", json.dumps(message))
-        return HttpResponse(f"Game created for room {room_code}", status=201)

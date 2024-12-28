@@ -10,5 +10,5 @@ urlpatterns = [
     path('<str:room_code>/status/', RoomStatusView.as_view(), name='room-status'),
     path('<str:room_code>/add-player/', AddPlayerToRoomView.as_view(), name='add-player'),
     path('<str:room_code>/<str:player_id>/remove-player/', RemovePlayerView.as_view(), name='remove-player'),
-    path('<str:room_code>/lock-tournament/', LockTournamentView.as_view(), name='lock-tournament'),
+    path('<str:room_code>/lock-tournament/', LockTournamentView.as_view(), name='lock-tournament')
 ]
