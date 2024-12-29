@@ -33,8 +33,12 @@ class OrchestratorListener:
         match.room.save()
 
     @sync_to_async
-    def update_bracket_position(self, player, position):
-        player.bracketsPosition = position
+    def update_bracket_position(self, player):
+        if player.bracketsPosition % 2 == 0:
+            new_position = player.bracketsPosition // 2
+        else:
+            new_position = (player.bracketsPosition + 1) // 2
+        player.bracketsPosition = new_position
         if player.bracketsPosition % 2 == 0:
             player.profileColor = 1
         else:
@@ -84,7 +88,6 @@ class OrchestratorListener:
 
                     as_players = await MatchPlayer.objects.filter(match=next_match).acount()
                     if as_players == 2:
-                        await self.update_bracket_position(winner, 2)
                         next_match.status = 1
                         await self.increment_stage(next_match)
                         channel_layer = get_channel_layer()
@@ -93,8 +96,7 @@ class OrchestratorListener:
 
                         asyncio.create_task(self.send_sync_match_message(channel_layer, next_match, match_players))
                         await next_match.asave()
-                    else:
-                        await self.update_bracket_position(winner, 1)
+                    await self.update_bracket_position(winner)
             else:
                 await self.update_stage_tournament_ended(match)
 
@@ -115,15 +117,12 @@ class OrchestratorListener:
         logger.info(f"Starting | {OrchestratorListener.__name__} | {self.send_sync_match_message.__name__}.")
         while True:
             logger.info(f"Waiting user enter in the room.")
-            # Obtenha a lista de jogadores e verifique o estado de conexão
             players_connected = await match_players.filter(player__isConnected=True).acount()
             total_players = await match_players.acount()
 
-            # Verifique se todos os jogadores estão conectados
             if players_connected == total_players:
                 break
 
-            # Aguarde um curto intervalo antes de verificar novamente
             await asyncio.sleep(5)
         
         players_list = [

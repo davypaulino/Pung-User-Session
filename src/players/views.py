@@ -26,16 +26,12 @@ class PlayerView(View):
 
 class PlayersInfoView(View):
     def get(self, request, game_id):
-        
         match = Match.objects.filter(gameId=game_id).first()
         if match is None:
             return JsonResponse({}, status=204)
         matchPlayers = MatchPlayer.objects.filter(match=match).select_related("player").all()
         players = [matchPlayer.player for matchPlayer in matchPlayers]
-            
-        # match = Match.objects.filter(gameId=game_id).first()
-        # players = Player.objects.filter(matches_played__match=match).distinct()
-        # players = Player.objects.filter(roomCode=room_code)
+
         if players is None:
             return JsonResponse({}, status=204)
         players_data = [

@@ -122,7 +122,7 @@ class CreateRoomView(View):
                 name="Bot",
                 roomId=new_room,
                 roomCode=new_room.code,
-                profileColor=setPlayerColor(new_room.code),
+                profileColor=1,
                 urlProfileImage=f"/assets/img/{random.choice([1, 2])}.png"
             )
             new_room.maxAmountOfPlayers += 1
@@ -228,8 +228,9 @@ class TournamentView(View):
                 num_players = 0
             else:
                 players_info = {}
-                for match in Match.objects.filter(room=room, status=1):
-                    matchPlayers = MatchPlayer.objects.filter(match=match)
+                for match in Match.objects.filter(room=room, status=1).all():
+                    matchPlayers = MatchPlayer.objects.filter(match=match).select_related("player").all()
+
                     if matchPlayers.count() == 0:
                         return JsonResponse({'errorCode': '404', 'message': 'Match not found'}, status=404)
                     if matchPlayers.count() != 2:
@@ -394,7 +395,6 @@ class LockTournamentView(View):
                 return JsonResponse({'errorCode': '400', 'message': 'Bad request'}, status=400)
 
             room.status = RoomStatus.READY_FOR_START.value
-            # room.stage += 1
             room.save()
 
             matches = Match.objects.filter(room=room)
