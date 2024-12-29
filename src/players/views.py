@@ -7,6 +7,9 @@ from asgiref.sync import async_to_sync
 
 class PlayerView(View):
     def get(self, request, id):
+        if not id:
+            return JsonResponse({'errorCode': '400', 'message': 'Bad Request'}, status=404)
+       
         player = Player.objects.filter(id=id, status=True).first()
         if player is None:
             return JsonResponse({}, status=204)
@@ -26,6 +29,9 @@ class PlayerView(View):
 
 class PlayersInfoView(View):
     def get(self, request, game_id):
+        if not game_id:
+            return JsonResponse({'errorCode': '400', 'message': 'Bad Request'}, status=404)
+       
         match = Match.objects.filter(gameId=game_id).first()
         if match is None:
             return JsonResponse({}, status=204)
@@ -52,6 +58,9 @@ class PlayersInfoView(View):
 
 class UpdatePlayerScoreView(View):
     def post(self, request, room_code, player_color):
+        if not room_code or not player_color:
+            return JsonResponse({'errorCode': '400', 'message': 'Bad Request'}, status=404)
+
         color = int(player_color)
         player = Player.objects.filter(roomCode=room_code, profileColor=color).first()
         if player is None:

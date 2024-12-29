@@ -8,6 +8,8 @@ from .models import roomTypes, Room, Match
 from players.models import Player, playerColors, MatchPlayer
 
 def get_room_type_range(room_type):
+    if not room_type:
+        raise ValueError(f"invalid param")
     if room_type == roomTypes.MATCH:
         return [2, 4]
     if room_type == roomTypes.TOURNAMENT:
@@ -18,7 +20,7 @@ def get_room_type_range(room_type):
 
 def validate_field(data, field, field_type, default=None, required=True):
     value = data.get(field, default)
-    if required and value is None:
+    if required and (not value or value is None):
         raise ValueError(f"'{field}' field is mandatory.")
     if not isinstance(value, field_type):
         raise ValueError(f"'{field}' type value is {field_type.__name__}.")
@@ -26,7 +28,7 @@ def validate_field(data, field, field_type, default=None, required=True):
 
 def validate_name_field(data, field, required=True):
     value = data.get(field, "Senhor Bolinha")
-    if required and value is None:
+    if required and (not value or value is None):
         raise ValueError(f"'{field}' field is mandatory.")
     if not isinstance(value, str):
         raise ValueError(f"'{field}' type value is {str.__name__}.")
@@ -36,7 +38,7 @@ def validate_name_field(data, field, required=True):
 
 def validate_integer_field(data, field, default=None, required=True):
     value = data.get(field, default)
-    if required and value is None:
+    if required and (not value or value is None):
         raise ValueError(f"'{field}' field is mandatory.")
     if isinstance(value, str):
         try:
@@ -50,7 +52,7 @@ def validate_integer_field(data, field, default=None, required=True):
 
 def validate_amount_players(data, field, field_type, room_type):
     value = data.get(field)
-    if value is None:
+    if (not value or value is None):
         raise ValueError(f"'{field}' field is mandatory.")
     if isinstance(value, str):
         try:

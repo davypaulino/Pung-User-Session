@@ -75,6 +75,9 @@ class CreateRoomView(View):
             return JsonResponse({'errorCode': '402', 'message': 'Bad Request'}, status=400)
         try:
             data = json.loads(request.body)
+            if not data:
+                return JsonResponse({'errorCode': '400', 'message': 'Bad Request'}, status=404)
+       
         except json.JSONDecodeError:
             return JsonResponse({'errorCode': '401', 'message': 'Bad Request'}, status=400)
 
@@ -142,8 +145,8 @@ class CreateRoomView(View):
 class RoomView(View):
     def delete(self, request, room_code):
         userId = request.headers.get("X-User-Id")
-        if userId is None:
-            return JsonResponse({'errorCode': '401', 'message': 'Unauthorized'}, status=401)
+        if not userId or not room_code:
+            return JsonResponse({'errorCode': '400', 'message': 'Bad request'}, status=400)
 
         room = Room.objects.filter(code=room_code).first()
         if room is None:
@@ -151,6 +154,8 @@ class RoomView(View):
 
         players = Player.objects.filter(roomCode=room_code)
         user = players.filter(id=userId).first()
+        if user is None:
+            return JsonResponse({'errorCode': '401', 'message': 'Unauthorized'}, status=401)
         if room.createdBy != user.id:
             return JsonResponse({'errorCode': '403', 'message': 'Forbidden'}, status=403)
 
@@ -165,12 +170,17 @@ class RoomView(View):
 
     def get(self, request, room_code):
         try:
-            room = Room.objects.get(code=room_code)
             userId = request.headers.get("X-User-Id")
+            if not userId or not room_code:
+                return JsonResponse({'errorCode': '400', 'message': 'Bad request'}, status=400)
+
+            room = Room.objects.get(code=room_code)
+            if room is None or room.type == 1:
+                return JsonResponse({'errorCode': '400', 'message': 'Bad request'}, status=400)
+
             user = Player.objects.filter(roomCode=room.code, id=userId).first()
             if user is None:
                 return JsonResponse({'errorCode': '403', 'message': 'Forbidden'}, status=403)
-
             players = Player.objects.filter(roomCode=room.code)
             players_data = [
                 {
@@ -201,12 +211,17 @@ class RoomView(View):
 class TournamentView(View):
     def get(self, request, room_code):
         try:
-            room = Room.objects.get(code=room_code)
             userId = request.headers.get("X-User-Id")
+            if not userId or not room_code:
+                return JsonResponse({'errorCode': '400', 'message': 'Bad request'}, status=400)
+
+            room = Room.objects.get(code=room_code)
+            if room is None or room.type != 1:
+                return JsonResponse({'errorCode': '400', 'message': 'Bad request'}, status=400)
+
             user = Player.objects.filter(roomCode=room.code, id=userId).first()
             if user is None:
                 return JsonResponse({'errorCode': '403', 'message': 'Forbidden'}, status=403)
-
             players_data = {}
             matchsCount = room.maxAmountOfPlayers // 2 ** (room.stage - 1)
             total_positions = matchsCount * 2
@@ -281,6 +296,8 @@ class TournamentView(View):
 
 class RoomStatusView(View):
     def get(self, request, room_code):
+        if not room_code:
+            return JsonResponse({'errorCode': '400', 'message': 'Bad Request'}, status=404)
         try:
             room = Room.objects.get(code=room_code)
             return JsonResponse({'status': str(room.status)})
@@ -290,12 +307,15 @@ class RoomStatusView(View):
 class AddPlayerToRoomView(View):
     def put(self, request, room_code):
 
-        if not request.body or request.body.strip() == b'':
-            return JsonResponse({'errorCode': '402', 'message': 'Bad Request'}, status=400)
+        if not request.body or request.body.strip() == b'' or not room_code:
+            return JsonResponse({'errorCode': '400', 'message': 'Bad Request'}, status=400)
         try:
             data = json.loads(request.body)
+            if not data:
+                return JsonResponse({'errorCode': '400', 'message': 'Bad Request'}, status=404)
+       
         except json.JSONDecodeError:
-            return JsonResponse({'errorCode': '401', 'message': 'Bad Request'}, status=400)
+            return JsonResponse({'errorCode': '400', 'message': 'Bad Request'}, status=400)
 
         try:
             player_name = validate_name_field(data, "playerName")
@@ -349,6 +369,9 @@ class AddPlayerToRoomView(View):
 
 class RemovePlayerView(View):
     def delete(self, request, room_code, player_id):
+        if not room_code or not player_id:
+            return JsonResponse({'errorCode': '400', 'message': 'Bad Request'}, status=404)
+       
         try:
             room = Room.objects.get(code=room_code)
         except Room.DoesNotExist:
@@ -379,8 +402,11 @@ class RemovePlayerView(View):
 class LockTournamentView(View):
     def post(self, request, room_code):
         try:
-            room = Room.objects.get(code=room_code)
             userId = request.headers.get("X-User-Id")
+            if not userId or not room_code:
+                return JsonResponse({'errorCode': '400', 'message': 'badRequest'}, status=400)
+            
+            room = Room.objects.get(code=room_code)
             user = Player.objects.filter(roomCode=room.code, id=userId).first()
             if user is None:
                 return JsonResponse({'errorCode': '403', 'message': 'Forbidden'}, status=403)

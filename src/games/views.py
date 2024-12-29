@@ -18,8 +18,7 @@ redis_client = redis.Redis(host='redis', port=6379, db=0, decode_responses=True)
 class GameView(View):
     def post(self, request, room_code):
         user_id = request.headers.get('X-User-Id')
-        logger.info(f"{GameView.__name__} | recebeu uma requisicao")
-        if user_id is None:
+        if user_id is None or not room_code or not user_id:
             return HttpResponse(f"User ID not found", status=400)
 
         room = Room.objects.filter(code=room_code).first()
@@ -93,7 +92,7 @@ class GameView(View):
 class TournamentGameView(View):
     def post(self, request, room_code):
         user_id = request.headers.get('X-User-Id')
-        if user_id is None:
+        if user_id is None or not room_code or not user_id:
             return HttpResponse(f"User ID not found", status=400)
 
         room = Room.objects.filter(code=room_code).first()
