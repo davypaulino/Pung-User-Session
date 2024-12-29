@@ -181,7 +181,7 @@ class RoomView(View):
             user = Player.objects.filter(roomCode=room.code, id=userId).first()
             if user is None:
                 return JsonResponse({'errorCode': '403', 'message': 'Forbidden'}, status=403)
-            players = Player.objects.filter(roomCode=room.code)
+            players = Player.objects.filter(roomCode=room.code).order_by('profileColor')
             players_data = [
                 {
                     'id': player.id if user.id == room.createdBy else None,

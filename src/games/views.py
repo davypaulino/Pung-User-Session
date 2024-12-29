@@ -30,6 +30,8 @@ class GameView(View):
             return HttpResponse(f"User {user_id} is not the owner of room {room_code}", status=403)
         if room.type == roomTypes.TOURNAMENT.value:
             return HttpResponse(f"Room {room_code} is not a match game room", status=403)
+        if room.amountOfPlayers != room.maxAmountOfPlayers and room.type != roomTypes.SINGLE_PLAYER.value:
+            return HttpResponse(f"Room {room_code} is not full", status=403)
 
         room.status = RoomStatus.CREATING_GAME
         room.save()
@@ -102,6 +104,8 @@ class TournamentGameView(View):
             return HttpResponse(f"Minimal amount of players {4}", status=401)
         if room.type != roomTypes.TOURNAMENT.value:
             return HttpResponse(f"Room {room_code} is not a tournament game room", status=403)
+        if room.amountOfPlayers != room.maxAmountOfPlayers:
+            return HttpResponse(f"Room {room_code} is not full", status=403)
 
         room.status = RoomStatus.CREATING_GAME
         room.save()

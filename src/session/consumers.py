@@ -46,6 +46,13 @@ class RoomConsumer(AsyncWebsocketConsumer):
             self.channel_name
         )
 
+        match = await self.repository.get_match_by_player_id_and_status(self.user_id)
+        if match is not None:
+            await self.channel_layer.groupadd(
+                f"room{self.roomname}{match.id}",
+                self.channel_name
+            )
+
         self.repository.update_player_connected_status(self.user_id, True)
 
     async def player_list_update(self, event):
