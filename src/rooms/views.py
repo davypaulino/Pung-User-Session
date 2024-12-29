@@ -189,6 +189,7 @@ class RoomView(View):
                     'profileColor': player.profileColor,
                     'urlProfileImage': player.urlProfileImage,
                     "owner": player.id == room.createdBy,
+                    "you": True if user.id == player.id else False,
                 }
                 for player in players
             ]
@@ -233,7 +234,8 @@ class TournamentView(View):
                         players_data[i] = {
                             "name": player.name,
                             "urlProfileImage": player.urlProfileImage,
-                            "color": player.profileColor
+                            "color": player.profileColor,
+                            "you": True if user.id == player.id else False,
                         }
                     else:
                         players_data[i] = None

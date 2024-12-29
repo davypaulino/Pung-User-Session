@@ -13,7 +13,7 @@ def get_room_type_range(room_type):
     if room_type == roomTypes.MATCH:
         return [2, 4]
     if room_type == roomTypes.TOURNAMENT:
-        return [4, 8, 16]
+        return [4, 8]
     if room_type == roomTypes.SINGLE_PLAYER:
         return [1]
     raise ValueError(f"Invalid room type: {room_type}")
