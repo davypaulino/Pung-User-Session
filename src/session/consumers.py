@@ -48,8 +48,8 @@ class RoomConsumer(AsyncWebsocketConsumer):
 
         match = await self.repository.get_match_by_player_id_and_status(self.user_id)
         if match is not None:
-            await self.channel_layer.groupadd(
-                f"room{self.roomname}{match.id}",
+            await self.channel_layer.group_discard(
+                f"room_{self.room_name}_{match.id}",
                 self.channel_name
             )
 
