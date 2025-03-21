@@ -79,7 +79,7 @@ class CreateRoomView(View):
                 return JsonResponse({'errorCode': '400', 'message': 'Bad Request'}, status=404)
        
         except json.JSONDecodeError:
-            return JsonResponse({'errorCode': '401', 'message': 'Bad Request'}, status=400)
+            return JsonResponse({'errorCode': '407', 'message': 'Bad Request'}, status=400)
 
         try:
             created_by = validate_field(data, "createdBy", str)
@@ -92,7 +92,7 @@ class CreateRoomView(View):
                 return JsonResponse({'errorCode': '400', 'message': 'createdBy and roomName fields are mandatory.'}, status=400)
 
         except (ValueError, TypeError) as e:
-            return JsonResponse({'errorCode': '400', 'message': f"{e}."}, status=400)
+            return JsonResponse({'errorCode': '409', 'message': f"{e}."}, status=400)
 
         new_room = Room.objects.create(
             name=room_name,
@@ -172,7 +172,7 @@ class RoomView(View):
         try:
             userId = request.headers.get("X-User-Id")
             if not userId or not room_code:
-                return JsonResponse({'errorCode': '400', 'message': 'Bad request'}, status=400)
+                return JsonResponse({'errorCode': '409', 'message': 'Bad request'}, status=400)
 
             room = Room.objects.get(code=room_code)
             if room is None or room.type == 1:

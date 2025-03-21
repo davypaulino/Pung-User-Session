@@ -38,7 +38,7 @@ def validate_name_field(data, field, required=True):
 
 def validate_integer_field(data, field, default=None, required=True):
     value = data.get(field, default)
-    if required and (not value or value is None):
+    if required and (value is None):
         raise ValueError(f"'{field}' field is mandatory.")
     if isinstance(value, str):
         try:
