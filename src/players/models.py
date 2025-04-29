@@ -6,10 +6,10 @@ from enum import Enum
 from rooms.models import Room, Match
 
 class playerColors(Enum):
-    RED = 0
-    BLUE = 1
-    GREEN = 2
-    YELLOW = 3
+    RED = 1
+    BLUE = 2
+    GREEN = 3
+    YELLOW = 4
 
 class Player(models.Model):
     id = models.CharField(primary_key=True, max_length=64, editable=False)
