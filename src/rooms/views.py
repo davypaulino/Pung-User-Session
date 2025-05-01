@@ -20,11 +20,11 @@ logger = logging.getLogger(__name__)
 class RoomGetView(View):
     def get(self, request):
         try:
-            current_page = int(request.GET.get('currentPage', 1))
+            current_page = int(request.GET.get('page', 1))
         except ValueError:
             current_page = 1
-        page_size = int(request.GET.get('pageSize', 10))
-        filter_label = request.GET.get('filterLabel', '')
+        page_size = int(request.GET.get('size', 10))
+        filter_label = request.GET.get('filter', '')
 
         rooms = Room.objects.filter(privateRoom=False, amountOfPlayers__lt=F('maxAmountOfPlayers'), status__lt=RoomStatus.READY_FOR_START.value).order_by('name')
         if filter_label:
@@ -63,7 +63,8 @@ class RoomGetView(View):
             "hasNextPage": paginated_rooms.has_next(),
             "hasPreviousPage": paginated_rooms.has_previous(),
             "totalPages": total_pages,
-            "content": data
+            "content": data,
+            "totalItems": total_items
         }
 
         return JsonResponse(response)
