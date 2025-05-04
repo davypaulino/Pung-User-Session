@@ -125,7 +125,7 @@ class CreateRoomView(View):
                 name="Bot",
                 roomId=new_room,
                 roomCode=new_room.code,
-                profileColor=1,
+                profileColor=2,
                 urlProfileImage=f"/assets/img/{random.choice([1, 2])}.png"
             )
             new_room.maxAmountOfPlayers += 1
@@ -183,7 +183,8 @@ class RoomView(View):
             if user is None:
                 return JsonResponse({'errorCode': '403', 'message': 'Forbidden'}, status=403)
             players = Player.objects.filter(roomCode=room.code).order_by('profileColor')
-            players_data = [
+            players_data = {
+                player.profileColor:
                 {
                     'id': player.id if user.id == room.createdBy else None,
                     'name': player.name,
@@ -193,7 +194,7 @@ class RoomView(View):
                     "you": user.id == player.id,
                 }
                 for player in players
-            ]
+            }
             return JsonResponse(
                 {
                     'roomId': room.id,
