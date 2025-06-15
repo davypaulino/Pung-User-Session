@@ -39,8 +39,46 @@ INSTALLED_APPS = [
     "corsheaders",
     "channels",
     'games',
-    'worker'
+    'worker',
+    'roomsv2',
+
+    'rest_framework',
+    'rest_framework_simplejwt',
 ]
+
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'session.auth_check.CustomJWTAuthentication',
+    ),
+    'DEFAULT_RENDERER_CLASSES': [
+        'rest_framework.renderers.JSONRenderer',
+    ],
+    'EXCEPTION_HANDLER': 'session.exception_handler.custom_exception_handler',
+    # Opcional: Se você quiser um tamanho de página padrão global,
+    # caso sua CustomRoomPagination não defina um default page_size
+    # 'DEFAULT_PAGINATION_CLASS': 'myapp.pagination.CustomRoomPagination',
+    # 'PAGE_SIZE': 10,
+}
+
+from datetime import timedelta
+print(f"DEBUG: Logger name for custom_exception_handler module is: {os.environ.get('JWT_SIGNING_KEY')}")
+
+SIMPLE_JWT = {
+    "ACCESS_TOKEN_LIFETIME": timedelta(hours=1),
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
+
+    "ALGORITHM": "HS256",
+    "SIGNING_KEY": os.environ.get("JWT_SIGNING_KEY", ""),  # <--- CRÍTICO: USE A CHAVE EXATA DA API EXTERNA
+    "VERIFYING_KEY": os.environ.get("JWT_SIGNING_KEY", ""),
+
+    "AUTH_HEADER_TYPES": ("Bearer",),
+    "USER_ID_FIELD": "id",
+    "USER_ID_CLAIM": "sub",
+
+    "ROTATE_REFRESH_TOKENS": False,
+    "BLACKLIST_AFTER_ROTATION": False,
+    "LEEWAY": 120,
+}
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
@@ -115,13 +153,20 @@ LOGGING = {
             'format': '{levelname} {message}',
             'style': '{',
         },
+        'json': {
+            '()': 'pythonjsonlogger.jsonlogger.JsonFormatter',
+            # You can customize the base format string if needed,
+            # but JsonFormatter will automatically include all 'extra' fields.
+            # Example format string if you still want some standard fields:
+            'format': '%(levelname)s %(asctime)s %(name)s %(message)s'
+        },
     },
     'handlers': {
         'console': {
             'level': 'DEBUG',  # Captura todos os níveis
             'class': 'logging.StreamHandler',
             'stream': 'ext://sys.stdout',  # Garante que a saída seja o terminal padrão
-            'formatter': 'verbose',  # Formato detalhado
+            'formatter': 'json',  # Formato detalhado
         },
     },
     'loggers': {

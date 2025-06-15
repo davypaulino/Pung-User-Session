@@ -20,11 +20,11 @@ logger = logging.getLogger(__name__)
 class RoomGetView(View):
     def get(self, request):
         try:
-            current_page = int(request.GET.get('currentPage', 1))
+            current_page = int(request.GET.get('page', 1))
         except ValueError:
             current_page = 1
-        page_size = int(request.GET.get('pageSize', 10))
-        filter_label = request.GET.get('filterLabel', '')
+        page_size = int(request.GET.get('size', 10))
+        filter_label = request.GET.get('filter', '')
 
         rooms = Room.objects.filter(privateRoom=False, amountOfPlayers__lt=F('maxAmountOfPlayers'), status__lt=RoomStatus.READY_FOR_START.value).order_by('name')
         if filter_label:
@@ -43,10 +43,11 @@ class RoomGetView(View):
         data = [
             {
                 "roomCode": room.code,
-                "amountOfPlayers": room.amountOfPlayers,
-                "maxAmountOfPlayers": room.maxAmountOfPlayers,
+                "numberOfPlayers": room.amountOfPlayers,
+                "maxNumberOfPlayers": room.maxAmountOfPlayers,
                 "roomName": room.name,
-                "roomType": room.type
+                "type": room.type,
+                "owner": "red"
             }
             for room in paginated_rooms
         ]
@@ -55,16 +56,15 @@ class RoomGetView(View):
         total_pages = (total_items + page_size - 1) // page_size
 
         response = {
-            "paginatedItems": {
-                "currentPage": paginated_rooms.number,
-                "pageSize": page_size,
-                "nextPage": paginated_rooms.next_page_number() if paginated_rooms.has_next() else None,
-                "previousPage": paginated_rooms.previous_page_number() if paginated_rooms.has_previous() else None,
-                "hasNextPage": paginated_rooms.has_next(),
-                "hasPreviousPage": paginated_rooms.has_previous(),
-                "totalPages": total_pages,
-                "Data": data
-            }
+            "currentPage": paginated_rooms.number,
+            "pageSize": page_size,
+            "nextPage": paginated_rooms.next_page_number() if paginated_rooms.has_next() else None,
+            "previousPage": paginated_rooms.previous_page_number() if paginated_rooms.has_previous() else None,
+            "hasNextPage": paginated_rooms.has_next(),
+            "hasPreviousPage": paginated_rooms.has_previous(),
+            "totalPages": total_pages,
+            "content": data,
+            "totalItems": total_items
         }
 
         return JsonResponse(response)
@@ -112,9 +112,9 @@ class CreateRoomView(View):
         if new_room.type == roomTypes.TOURNAMENT.value:
             new_player.bracketsPosition = setBracketsPosition(new_room.code)
             if new_player.bracketsPosition % 2 == 0:
-                new_player.profileColor = 1
-            else:
                 new_player.profileColor = 0
+            else:
+                new_player.profileColor = 1
             new_player.save()
 
         new_room.createdBy = new_player.id
@@ -125,7 +125,7 @@ class CreateRoomView(View):
                 name="Bot",
                 roomId=new_room,
                 roomCode=new_room.code,
-                profileColor=1,
+                profileColor=2,
                 urlProfileImage=f"/assets/img/{random.choice([1, 2])}.png"
             )
             new_room.maxAmountOfPlayers += 1
@@ -139,6 +139,7 @@ class CreateRoomView(View):
             headers={
                 'Location': f'/session/rooms/{new_room.code}',
                 'X-User-Id': new_room.createdBy,
+                'X-User-Color': new_player.profileColor
             }
         )
 
@@ -182,17 +183,18 @@ class RoomView(View):
             if user is None:
                 return JsonResponse({'errorCode': '403', 'message': 'Forbidden'}, status=403)
             players = Player.objects.filter(roomCode=room.code).order_by('profileColor')
-            players_data = [
+            players_data = {
+                player.profileColor:
                 {
                     'id': player.id if user.id == room.createdBy else None,
                     'name': player.name,
-                    'profileColor': player.profileColor,
+                    'color': player.profileColor,
                     'urlProfileImage': player.urlProfileImage,
-                    "owner": player.id == room.createdBy,
-                    "you": True if user.id == player.id else False,
+                    "owner": player.id == room.createdBy, 
+                    "you": user.id == player.id,
                 }
                 for player in players
-            ]
+            }
             return JsonResponse(
                 {
                     'roomId': room.id,
@@ -201,9 +203,9 @@ class RoomView(View):
                     'roomName': room.name,
                     'maxAmountOfPlayers': room.maxAmountOfPlayers,
                     'amountOfPlayers': len(players_data),
-                    'createdBy': room.createdBy,
                     'players': players_data,
-                    'isOwner': user.id == room.createdBy,
+                    'owner': user.id == room.createdBy,
+                    'ownerColor': user.profileColor,
                 }
             )
         except Room.DoesNotExist:
@@ -363,15 +365,21 @@ class AddPlayerToRoomView(View):
                 status=201,
                 headers={
                     'Location': f'/session/rooms/{room_code}',
-                    'X-User-Id': player.id
+                    'X-User-Id': player.id,
+                    'X-User-Color': player.profileColor
                 }
             )
         except Room.DoesNotExist:
             return JsonResponse({'errorCode': '404', 'message': 'Room not found'}, status=404)
 
 class RemovePlayerView(View):
-    def delete(self, request, room_code, player_id):
-        if not room_code or not player_id:
+    def delete(self, request, room_code, color):
+
+        userId = request.headers.get("X-User-Id")
+        if not userId:
+            return JsonResponse({'errorCode': '400', 'message': 'Bad request'}, status=400)
+
+        if not room_code or not color:
             return JsonResponse({'errorCode': '400', 'message': 'Bad Request'}, status=404)
        
         try:
@@ -383,11 +391,16 @@ class RemovePlayerView(View):
             return JsonResponse({'errorCode': '400', 'message': 'Bad request'}, status=400)
 
         try:
-            player = Player.objects.get(id=player_id, roomCode=room_code)
+            user = Player.objects.get(id=userId, roomCode=room_code)
         except Player.DoesNotExist:
             return JsonResponse({"errorCode": "404", "message": "Player not found in the room"}, status=404)
 
-        update_players_list(room_code, player.id)
+        try:
+            player = Player.objects.get(profileColor=color, roomCode=room_code)
+        except Player.DoesNotExist:
+            return JsonResponse({"errorCode": "404", "message": "Player not found in the room"}, status=404)
+
+        update_players_list(room_code, player.profileColor)
 
         player.delete()
         room.amountOfPlayers -= 1
@@ -395,10 +408,7 @@ class RemovePlayerView(View):
 
         return HttpResponse(
             status=204,
-            headers={
-                'Location': f'/session/rooms/{room_code}/{player_id}',
-                'playerId': player_id
-            }
+            headers={}
         )
 
 class LockTournamentView(View):

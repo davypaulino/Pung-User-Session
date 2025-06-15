@@ -25,4 +25,3 @@ uvicorn==0.32.0
 uvloop==0.21.0
 watchfiles==0.24.0
 websockets==13.1
-python-json-logger==3.2.0

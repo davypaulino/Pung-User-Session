@@ -55,7 +55,7 @@ class OrchestratorListener:
 
         match = await Match.objects.filter(id=data["matchId"]).afirst()
         if (match is None):
-            return logger.error(f"Error | {OrchestratorListener.__name__} | process_game_sync | {e}")
+            return logger.error(f"Warn | {OrchestratorListener.__name__} | Not Found | Match {data['matchId']}")
 
         if data["type"] == "game-created":
             logger.info(f"{OrchestratorListener.__name__} | game-created | Match {match.id} | Game {match.gameId}.")
