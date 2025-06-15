@@ -1,0 +1,110 @@
+import requests
+from django.conf import settings
+from django.contrib.auth import get_user_model
+from rest_framework.authentication import BaseAuthentication
+from rest_framework.exceptions import AuthenticationFailed
+
+# Obtém o modelo de usuário ativo do Django (geralmente User ou um modelo personalizado)
+User = get_user_model()
+
+class GoLangTokenAuthentication(BaseAuthentication):
+    """
+    Classe de autenticação personalizada para validar tokens gerados por uma aplicação GoLang.
+    Espera um cabeçalho Authorization no formato "Bearer <token>".
+    """
+
+    def authenticate(self, request):
+        """
+        Método de autenticação principal.
+        Tenta autenticar a requisição usando um token da aplicação GoLang.
+        """
+        # Obtém o cabeçalho Authorization da requisição
+        auth_header = request.META.get('HTTP_AUTHORIZATION')
+
+        # Se não houver cabeçalho Authorization, não há tentativa de autenticação por token
+        if not auth_header:
+            return None
+
+        # Verifica se o cabeçalho tem o formato "Bearer <token>"
+        # O split()[0].lower() deve ser 'bearer'
+        try:
+            scheme, token = auth_header.split()
+            if scheme.lower() != 'bearer':
+                return None
+        except ValueError:
+            raise AuthenticationFailed('Cabeçalho de autorização inválido. Formato: Bearer <token>.')
+
+        # Log de depuração: mostra o token recebido (remova em produção)
+        # print(f"Token GoLang recebido: {token}")
+
+        # --- Parte Crucial: Validação do token com a aplicação GoLang ---
+        # Você precisará da URL do endpoint de validação da sua aplicação GoLang.
+        # Guarde esta URL em suas configurações (settings.py) para facilidade de gerenciamento.
+        golang_validation_url = getattr(settings, 'GOLANG_AUTH_VALIDATION_URL', None)
+
+        if not golang_validation_url:
+            raise Exception("URL de validação da aplicação GoLang não configurada em settings.py.")
+
+        try:
+            # Faz uma requisição POST ou GET para o seu endpoint de validação na GoLang
+            # Adapte 'headers' e 'json' conforme o que sua API GoLang espera.
+            # Se sua API GoLang espera o token como um cabeçalho 'X-Auth-Token' ou similar, ajuste aqui.
+            response = requests.post(
+                golang_validation_url,
+                json={'token': token}, # Exemplo: envia o token no corpo JSON
+                # headers={'Authorization': f'Bearer {token}'}, # Alternativa: reenvia o token como cabeçalho
+                timeout=5 # Define um timeout para a requisição
+            )
+            response.raise_for_status() # Lança um erro HTTP para respostas 4xx/5xx
+
+            # Assume que a API GoLang retorna um JSON com informações do usuário
+            # Por exemplo: {"is_valid": true, "user_id": "uuid_do_usuario", "email": "user@example.com", "name": "Nome do Usuário"}
+            validation_data = response.json()
+
+        except requests.exceptions.RequestException as e:
+            # Erros de conexão, timeout, ou status HTTP 4xx/5xx da API GoLang
+            raise AuthenticationFailed(f'Erro ao validar token com a aplicação GoLang: {e}')
+        except ValueError:
+            # Erro ao decodificar JSON (resposta inválida da GoLang)
+            raise AuthenticationFailed('Resposta inválida da aplicação GoLang.')
+
+        # Verifica se o token foi validado pela GoLang
+        if not validation_data.get('is_valid', False):
+            raise AuthenticationFailed('Token inválido ou expirado.')
+
+        # --- Encontra ou Cria o Usuário Django ---
+        # A partir das informações retornadas pela GoLang, mapeie para um usuário Django.
+        # Use um campo único como `email` ou `username` para encontrar o usuário.
+        # Se o usuário não existir no Django, você pode optar por criá-lo automaticamente
+        # ou exigir que ele já esteja pré-existente.
+
+        user_identifier = validation_data.get('email') # Ou 'user_id', 'username', etc.
+        if not user_identifier:
+            raise AuthenticationFailed('Dados do usuário insuficientes na resposta da aplicação GoLang.')
+
+        try:
+            # Tenta encontrar o usuário pelo identificador (ex: email)
+            user, created = User.objects.get_or_create(email=user_identifier)
+            # Se for 'username': user, created = User.objects.get_or_create(username=user_identifier)
+
+            # Opcional: Atualize outras informações do usuário se a GoLang as fornecer
+            if created:
+                user.set_unusable_password() # Se o usuário foi criado, ele não terá senha definida
+                user.first_name = validation_data.get('first_name', '')
+                user.last_name = validation_data.get('last_name', '')
+                # Adicione qualquer outro campo que você queira sincronizar
+                user.save()
+            elif validation_data.get('name'): # Exemplo: apenas atualiza se o nome for fornecido e diferente
+                if user.get_full_name() != validation_data.get('name'):
+                    user.first_name = validation_data.get('name').split(' ')[0]
+                    user.last_name = ' '.join(validation_data.get('name').split(' ')[1:]) if ' ' in validation_data.get('name') else ''
+                    user.save()
+
+
+        except User.DoesNotExist:
+            raise AuthenticationFailed('Usuário não encontrado no Django e não pode ser criado.')
+        except Exception as e:
+            raise AuthenticationFailed(f'Erro ao processar usuário Django: {e}')
+
+        # Se tudo deu certo, retorna o usuário e o token (o token aqui é o que veio da GoLang)
+        return (user, token)

@@ -14,6 +14,7 @@ class playerColors(Enum):
 class Player(models.Model):
     id = models.CharField(primary_key=True, max_length=64, editable=False)
     name = models.CharField(max_length=100)
+    userId = models.CharField(max_length=64, db_index=True, editable=False)
     roomId = models.ForeignKey(Room, related_name='players', on_delete=models.CASCADE)
     roomCode = models.CharField(max_length=64)
     profileColor = models.IntegerField(choices=[
@@ -35,6 +36,8 @@ class Player(models.Model):
     def save(self, *args, **kwargs):
         if not self.id:
             self.id = str(uuid.uuid4())
+        if not self.userId:
+            self.userId = str(uuid.uuid4())
         super().save(*args, **kwargs)
 
     def __str__(self):
