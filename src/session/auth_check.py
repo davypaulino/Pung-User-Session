@@ -13,6 +13,7 @@ class CustomJWTAuthentication(JWTAuthentication):
         user = User(id=user_id,
                     username=validated_token.get('nickname', user_id),
                     is_active=True)
+
         user.jwt_id = validated_token.get(api_settings.USER_ID_CLAIM)
         user.nickname = validated_token.get('nickname')
         user.role = validated_token.get('role')
