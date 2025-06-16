@@ -22,11 +22,12 @@ class GameView(View):
             return HttpResponse(f"User ID not found", status=400)
 
         room = Room.objects.filter(code=room_code).first()
-        if room is None:
-            return HttpResponse(f"Room {room_code} not found", status=400)
+        player = Player.objects.filter(id=user_id).first()
+        if room is None or player is None:
+            return HttpResponse(f"Room {room_code} or player {user_id} not found", status=404)
         if room.players.count() < 2:
             return HttpResponse(f"Minimal amount of players {2}", status=403)
-        if room.createdBy != user_id:
+        if room.createdBy != player.name:
             return HttpResponse(f"User {user_id} is not the owner of room {room_code}", status=403)
         if room.type == roomTypes.TOURNAMENT.value:
             return HttpResponse(f"Room {room_code} is not a match game room", status=403)

@@ -157,7 +157,7 @@ class RoomView(View):
         user = players.filter(id=userId).first()
         if user is None:
             return JsonResponse({'errorCode': '401', 'message': 'Unauthorized'}, status=401)
-        if room.createdBy != user.id:
+        if room.createdBy != user.name:
             return JsonResponse({'errorCode': '403', 'message': 'Forbidden'}, status=403)
 
         channel_layer = get_channel_layer()
@@ -190,7 +190,7 @@ class RoomView(View):
                     'name': player.name,
                     'color': player.profileColor,
                     'urlProfileImage': player.urlProfileImage,
-                    "owner": player.id == room.createdBy, 
+                    "owner": player.name == room.createdBy,
                     "you": user.id == player.id,
                 }
                 for player in players
@@ -204,7 +204,7 @@ class RoomView(View):
                     'maxAmountOfPlayers': room.maxAmountOfPlayers,
                     'amountOfPlayers': len(players_data),
                     'players': players_data,
-                    'owner': user.id == room.createdBy,
+                    'owner': user.name == room.createdBy,
                     'ownerColor': user.profileColor,
                 }
             )
@@ -380,7 +380,7 @@ class RemovePlayerView(View):
             return JsonResponse({'errorCode': '400', 'message': 'Bad request'}, status=400)
 
         if not room_code or not color:
-            return JsonResponse({'errorCode': '400', 'message': 'Bad Request'}, status=404)
+            return JsonResponse({'errorCode': '400', 'message': f'Bad Request: RoomcCode: {room_code} | Color: {color}' }, status=400)
        
         try:
             room = Room.objects.get(code=room_code)
@@ -388,7 +388,7 @@ class RemovePlayerView(View):
             return JsonResponse({'errorCode': '404', 'message': 'Room not found'}, status=404)
 
         if room.type is roomTypes.SINGLE_PLAYER:
-            return JsonResponse({'errorCode': '400', 'message': 'Bad request'}, status=400)
+            return JsonResponse({'errorCode': '400', 'message': f'Bad request Single Player Room'}, status=400)
 
         try:
             user = Player.objects.get(id=userId, roomCode=room_code)

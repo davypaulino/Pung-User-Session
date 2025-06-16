@@ -1,4 +1,5 @@
 from rest_framework import viewsets
+from rest_framework.views import APIView
 from rest_framework.generics import ListAPIView, CreateAPIView
 from rest_framework.response import Response
 from rest_framework.filters import SearchFilter
@@ -46,12 +47,9 @@ class CreateRoomAPIView(CreateAPIView):
 
         headers = self.get_success_headers(serializer.data)
 
-        # Construa os cabeçalhos customizados
-        # As informações do player foram anexadas temporariamente à instância 'room' no serializer.create()
-        # Ou você pode buscá-las do primeiro jogador:
         created_room = serializer.instance
-        # Assumindo que o createdBy da Room é o ID do Player criador
-        player = Player.objects.filter(id=created_room.createdBy, roomId=created_room).first()
+        jwt_user_id = request.user.jwt_id
+        player = Player.objects.filter(userId=jwt_user_id, roomId=created_room).first()
 
         custom_headers = {
             'Location': f'/rooms/{created_room.code}',
@@ -61,3 +59,40 @@ class CreateRoomAPIView(CreateAPIView):
             custom_headers['X-User-Color'] = player.profileColor
 
         return Response(serializer.data, status=status.HTTP_201_CREATED, headers=custom_headers)
+
+class RoomDetailView(APIView):
+    # Se você tiver autenticação e permissões configuradas no settings.py,
+    # elas serão aplicadas automaticamente aqui.
+    # Ex: authentication_classes = [TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, room_code):
+        try:
+            user_id = request.user.id
+            room = Room.objects.get(code=room_code)
+        except Room.DoesNotExist:
+            return Response({'errorCode': '404', 'message': 'Room not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        if room.type == 1: # Check is Tournament
+            return Response({'errorCode': '400', 'message': 'Bad request - Invalid room type'}, status=status.HTTP_400_BAD_REQUEST)
+
+        current_user_player_instance = Player.objects.filter(roomCode=room.code, id=user_id).first()
+        if not current_user_player_instance:
+            return Response({'errorCode': '403', 'message': 'Forbidden - User not in room'}, status=status.HTTP_403_FORBIDDEN)
+
+        # 4. Preparar contexto para o serializer
+        # Passamos o user_id do request e o createdBy da sala para o serializer
+        # para que a lógica de ocultar 'id' e 'owner' possa ser aplicada lá.
+        serializer_context = {
+            'request': request, # Passa o request completo para acesso no serializer
+            'request_user_id': user_id,
+            'room_created_by': room.createdBy, # Assumindo que room.createdBy é o ID do Player que criou a sala
+        }
+
+        # Adicionar propriedades dinâmicas ao objeto room ANTES de serializar
+        # Estes são usados pelos SerializerMethodField no RoomSerializer
+        room.is_owner_user = (str(user_id) == str(room.createdBy)) # Se o user_id atual é o owner da sala
+        # As propriedades 'is_owner' e 'is_you' para Player são calculadas dentro do PlayerSerializer
+
+        serializer = RoomSerializer(room, context=serializer_context)
+        return Response(serializer.data, status=status.HTTP_200_OK)

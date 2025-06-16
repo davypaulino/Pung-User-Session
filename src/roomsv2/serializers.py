@@ -114,3 +114,81 @@ class RoomCreateSerializer(serializers.ModelSerializer):
             'roomCode': instance.code,
             'roomType': instance.type
         }
+
+
+class PlayerSerializer(serializers.ModelSerializer):
+    # 'id' é incluído apenas se o usuário atual for o criador da sala
+    # 'name', 'color', 'urlProfileImage', 'owner', 'you' são padrão
+    id = serializers.SerializerMethodField()
+    owner = serializers.BooleanField(source='is_owner', read_only=True)  # Assumindo que você adicione is_owner no view
+    you = serializers.BooleanField(source='is_you', read_only=True)  # Assumindo que você adicione is_you no view
+
+    class Meta:
+        model = Player
+        fields = ['id', 'name', 'profileColor', 'urlProfileImage', 'owner', 'you']
+
+    def get_id(self, obj):
+        # A lógica para ocultar o ID se o usuário não for o owner da sala
+        # O self.context['request'] e self.context['room_owner_id'] virão do view
+        request_user_id = self.context['request_user_id']
+        room_created_by = self.context['room_created_by']
+        return obj.id if str(request_user_id) == str(room_created_by) else None
+
+
+class RoomSerializer(serializers.ModelSerializer):
+    players = serializers.SerializerMethodField()
+    amountOfPlayers = serializers.SerializerMethodField()
+    owner = serializers.BooleanField(source='is_owner_user', read_only=True)  # Assumindo is_owner_user no view
+    ownerColor = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Room
+        fields = [
+            'roomId', 'roomType', 'roomCode', 'roomName',
+            'maxAmountOfPlayers', 'amountOfPlayers', 'players',
+            'owner', 'ownerColor'
+        ]
+        # Mapeie os campos do seu modelo para os nomes do JSON de saída, se necessário
+        # Ex: room_id no JSON de saída para o campo 'id' do modelo
+        extra_kwargs = {
+            'id': {'source': 'roomId'},  # Se seu campo no modelo é 'id'
+            'type': {'source': 'roomType'},  # Se seu campo no modelo é 'type'
+            'code': {'source': 'roomCode'},
+            'name': {'source': 'roomName'},
+            'max_amount_of_players': {'source': 'maxAmountOfPlayers'},
+        }
+
+    def get_players(self, obj):
+        # Acessa o usuário logado e o usuário 'RoomOwner' do contexto da view
+        request_user_id = self.context['request_user_id']
+        room_created_by_id = self.context['room_created_by']
+
+        players = Player.objects.filter(roomCode=obj.code).order_by('profileColor')
+
+        # Passa informações adicionais para o contexto do PlayerSerializer
+        player_serializer_context = {
+            'request': self.context['request'],
+            'request_user_id': request_user_id,
+            'room_created_by': room_created_by_id,
+        }
+
+        # Converte para um dicionário com a cor como chave, como no seu código original
+        players_data = {
+            player.profileColor: PlayerSerializer(
+                player,
+                context=player_serializer_context  # Passa o contexto para o PlayerSerializer
+            ).data
+            for player in players
+        }
+        return players_data
+
+    def get_amountOfPlayers(self, obj):
+        return Player.objects.filter(roomCode=obj.code).count()
+
+    def get_ownerColor(self, obj):
+        # Supondo que você pode buscar o player dono da sala pela room.createdBy
+        try:
+            owner_player = Player.objects.get(id=obj.createdBy, roomCode=obj.code)
+            return owner_player.profileColor
+        except Player.DoesNotExist:
+            return None  # Ou um valor padrão/erro
